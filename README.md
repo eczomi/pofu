@@ -7,7 +7,7 @@
   İstersen seçtiğin her metni doğal bir sesle okur.</p>
 
   <p>
-    <a href="https://github.com/sevgiikilic/pofu/releases/latest"><b>⬇️ İndir (Windows) — Pofu-Setup.exe</b></a>
+    <a href="https://github.com/eczomi/pofu/releases/latest"><b>⬇️ İndir (Windows) — Pofu-Setup.exe</b></a>
   </p>
 </div>
 
@@ -41,12 +41,12 @@ soruysa **onay bekliyor**). Ekran kazıma, eklenti, hile yok — sadece dosya ok
 
 ## Kurulum
 
-**Kolay yol (Windows):** [Releases](https://github.com/sevgiikilic/pofu/releases/latest)
+**Kolay yol (Windows):** [Releases](https://github.com/eczomi/pofu/releases/latest)
 sayfasından `Pofu-Setup.exe` indir, çalıştır. Bitti.
 
 **Geliştirici yolu:**
 ```bash
-git clone https://github.com/sevgiikilic/pofu.git
+git clone https://github.com/eczomi/pofu.git
 cd pofu
 npm install
 npm start        # ya da Pofu.vbs'ye çift tıkla (konsolsuz)
@@ -99,7 +99,7 @@ private by default. Gestures: single-click = play/pause, double-click = mini mod
 speech-bubble notifications, drag to move.
 
 ```bash
-git clone https://github.com/sevgiikilic/pofu.git
+git clone https://github.com/eczomi/pofu.git
 cd pofu && npm install && npm start
 ```
 

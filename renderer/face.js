@@ -611,16 +611,33 @@ function save(partial) {
 // Satirlar tiklanabilir todo maddeleridir: isaretledikce ustu cizilir.
 function noteId() { return 'n' + Math.random().toString(36).slice(2, 9); }
 
+// Yapistirilan metni GERCEK todo maddelerine boler:
+// satirlar -> "1. x 2. y" numarali adimlar -> madde imleri -> uzun tek parca ise cumleler.
+function noteLines(text) {
+  let lines = String(text || '').split(/\n+/).map((s) => s.trim()).filter(Boolean);
+  lines = lines.flatMap((l) => l.split(/(?=(?:^|\s)\d+[.)]\s)/).map((s) => s.trim()).filter(Boolean));
+  lines = lines.flatMap((l) => l.split(/(?=(?:^|\s)[-•▪–]\s)/).map((s) => s.trim()).filter(Boolean));
+  if (lines.length === 1 && lines[0].length > 90) {
+    const parts = lines[0].match(/[^.!?…]+[.!?…]+["')\]]*\s*|[^.!?…]+$/g);
+    if (parts && parts.length > 1) lines = parts.map((s) => s.trim()).filter(Boolean);
+  }
+  // madde imi/numara onekini temizle (kutucuk zaten var)
+  return lines.map((l) => l.replace(/^(\d+[.)]|[-•▪–])\s+/, ''));
+}
+
 function addNote(text) {
   const t = (text || '').trim();
   if (!t) return;
   const notes = cfg.notes || [];
-  notes.unshift({ id: noteId(), text: t, done: {} });
+  notes.unshift({ id: noteId(), text: t, lines: noteLines(t), done: {} });
   while (notes.length > 20) notes.pop();
   save({ notes });
   renderNotes();
-  // Paneli goster (mini moddaysa cikar)
-  if (cfg.miniMode) { applyMini(false); window.okur.saveConfig({ miniMode: false }); }
+  // Paneli goster — mini moddaysa mini icinde ac (moddan cikmadan)
+  if (cfg.miniMode) {
+    miniNotesOpen = true;
+    document.getElementById('app').classList.add('notes-open');
+  }
   $('#settings').classList.add('hidden');
   $('#speakBox').classList.add('hidden');
   $('#notes').classList.remove('hidden');
@@ -632,6 +649,7 @@ function renderNotes() {
   if (!listEl) return;
   listEl.innerHTML = '';
   const notes = cfg.notes || [];
+  let undoneTotal = 0;
   for (const n of notes) {
     const box = document.createElement('div');
     box.className = 'note';
@@ -647,8 +665,9 @@ function renderNotes() {
 
     const time = document.createElement('span');
     time.className = 'note-count';
-    const lines = n.text.split(/\n+/).map((s) => s.trim()).filter(Boolean);
+    const lines = n.lines || noteLines(n.text);
     const doneCount = Object.values(n.done || {}).filter(Boolean).length;
+    undoneTotal += Math.max(0, lines.length - doneCount);
     time.textContent = doneCount + '/' + lines.length;
 
     const del = document.createElement('button');
@@ -687,12 +706,23 @@ function renderNotes() {
   if (hint) hint.textContent = notes.length
     ? ''
     : 'Kopyala → ' + prettyHotkey(cfg.noteHotkey) + ' → adımlar buraya düşer. Satıra tıkla: yapıldı.';
+
+  // Mini mod cipi: maskotun altinda "n görev"
+  const chip = $('#miniChip');
+  if (chip) {
+    chip.textContent = undoneTotal + ' görev';
+    chip.classList.toggle('has', notes.length > 0);
+  }
 }
 
 // ---- Maskot jestleri: tut-tasi / tek tik = oynat-duraklat / cift tik = mini mod ----
+let miniNotesOpen = false;
+
 function applyMini(m) {
   cfg.miniMode = !!m;
-  document.getElementById('app').classList.toggle('mini', !!m);
+  const app = document.getElementById('app');
+  app.classList.toggle('mini', !!m);
+  if (!m) { miniNotesOpen = false; app.classList.remove('notes-open'); }
   requestResize();
 }
 
@@ -737,6 +767,27 @@ function bindFaceGestures() {
       tapTimer = setTimeout(() => { tapTimer = null; toggle(); }, 280);
     }
   });
+
+  // Sag tik: ayarlari ac (mini moddaysa cikar)
+  face.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if (cfg.miniMode) { applyMini(false); window.okur.saveConfig({ miniMode: false }); }
+    $('#speakBox').classList.add('hidden');
+    $('#settings').classList.remove('hidden');
+    requestResize();
+  });
+
+  // Mini mod gorev cipi: tikla -> gorevler paneli ac/kapat (mini icinde)
+  const chip = $('#miniChip');
+  if (chip) {
+    chip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      miniNotesOpen = !miniNotesOpen;
+      document.getElementById('app').classList.toggle('notes-open', miniNotesOpen);
+      if (miniNotesOpen) { renderNotes(); $('#notes').classList.remove('hidden'); }
+      requestResize();
+    });
+  }
 }
 
 function bindUI() {
@@ -833,7 +884,7 @@ window.okur.onCommand((msg) => {
 let lastH = 0;
 let lastW = 0;
 function contentWidth() {
-  if (cfg.miniMode) return bubbleShowing ? 248 : 68;
+  if (cfg.miniMode) return (bubbleShowing || miniNotesOpen) ? 248 : 68;
   return 248;
 }
 let resizeTimer = null;

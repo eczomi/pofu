@@ -530,8 +530,29 @@ button, select, input, textarea, .sheet, #face {
 .srow.foot { justify-content: space-between; margin-top: 7px; }
 .srow.foot .hint { margin-top: 0; }
 
-/* --- Mini mod: cift tik -> yalniz kucuk maskot (+ balon) --- */
-#app.mini { padding: 3px; }
+/* --- Mini mod gorev cipi --- */
+#miniChip {
+  display: none;
+  position: absolute;
+  bottom: -10px; left: 50%;
+  transform: translateX(-50%);
+  align-items: center;
+  font-size: 8.5px; font-weight: 650;
+  white-space: nowrap;
+  padding: 1px 8px 2px;
+  border-radius: 999px;
+  background: var(--glass-2);
+  border: 1px solid rgba(167, 139, 250, 0.32);
+  color: var(--vio-bright);
+  cursor: pointer;
+  z-index: 2;
+  -webkit-app-region: no-drag;
+  transition: background 0.15s;
+}
+#miniChip:hover { background: rgba(147, 112, 250, 0.22); }
+
+/* --- Mini mod: cift tik -> yalniz kucuk maskot (+ balon + gorev cipi) --- */
+#app.mini { padding: 3px 3px 10px; }
 #app.mini #grip,
 #app.mini #headRight,
 #app.mini .sheet,
@@ -540,6 +561,8 @@ button, select, input, textarea, .sheet, #face {
 #app.mini #stage { width: 56px; height: 56px; }
 #app.mini #face { width: 48px; height: 48px; }
 #app.mini #halo { inset: -6px; }
+#app.mini #miniChip.has { display: inline-flex; }
+#app.mini.notes-open #notes { display: block !important; }
 
 /* Azaltilmis hareket */
 @media (prefers-reduced-motion: reduce) {
