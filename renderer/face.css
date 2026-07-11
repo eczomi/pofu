@@ -342,6 +342,30 @@ button, select, input, textarea, .sheet, #face {
 }
 
 /* --- Altyazi (okunan metin) --- */
+.cap-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  padding: 0 3px 4px;
+  position: sticky; top: 0;
+  background: linear-gradient(180deg, var(--glass) 75%, transparent);
+  z-index: 1;
+}
+.cap-close {
+  width: 18px; height: 18px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 50%;
+  background: transparent;
+  color: var(--ink-dim);
+  font-size: 14px; line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.cap-close:hover { background: rgba(239, 106, 125, 0.18); color: #fff; }
+
 #caption { max-height: 150px; overflow-y: auto; scrollbar-width: thin; }
 #caption::-webkit-scrollbar { width: 5px; }
 #caption::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 3px; }

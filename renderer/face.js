@@ -603,6 +603,11 @@ function bindUI() {
     if (t && t.value.trim()) { window.okur.readText(t.value); }
   });
   $('#btnReadClip').addEventListener('click', () => window.okur.readClipboard());
+  // Okunan metin panelini kapat (ses calmaya devam eder; yeni okumada tekrar acilir)
+  $('#btnCapClose').addEventListener('click', (e) => {
+    e.stopPropagation();
+    $('#caption').classList.add('hidden');
+  });
   $('#btnQuit').addEventListener('click', () => window.okur.quit());
 
   $('#setEngine').addEventListener('change', (e) => { save({ engine: e.target.value }); detectEngine(); });
