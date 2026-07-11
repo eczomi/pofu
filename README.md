@@ -16,11 +16,12 @@ her uygulamanın üstünde. Sen başka bir işle uğraşırken Claude'un yazdı�
 
 ### Ne yapar?
 
-- 🔔 **Metinli bildirim merkezi (asıl özellik)** — birden çok Claude penceresi/sekmesinde
-  çalışırken ekrana dönmeden göz at: hangi sekmede **"onay bekliyor"**, hangisinde
-  **"konuşma sonlandı"** — proje adı + saatle. Sese güvenmene gerek yok; sesler karışmaz.
-- 🗂️ **Birden fazla oturum** — her Claude penceresi ayrı izlenir; bildirimde hangisi
-  olduğu yazar (örn. `para-app`, `web-proje 2`).
+- 🔔 **Oturum barı (asıl özellik)** — birden çok Claude penceresi/sekmesinde çalışırken
+  ekrana dönmeden göz at: her oturum canlı bir satır. **Çalışıyor** = akan ışık çubuğu,
+  **onay bekliyor** = parlak nabız, **bitti** = parlak + son mesajın başlığı. Saatle birlikte.
+- 🖱️ **Satıra tıkla → o pencereye git** — biten/onay bekleyen oturuma tıklarsan o VS Code
+  penceresi öne gelir. Satırdaki hoparlörle son mesajı sesli dinlersin.
+- ✋ **Her yerinden tut, taşı** — pencereyi arka planından tutup istediğin köşeye sürükle.
 - ✋ **Seçtiğin metni okut (sağ tık)** — herhangi bir web sayfası/kitap/PDF'te metni seç,
   **sağ tık → "Oku"** (Chrome/Edge uzantısı) → minik ajan okur, **ne okuduğunu** üstünde
   kısaca yazar. Kısayol da var (`Ctrl+Alt+S`). Yapıştırma yok.
