@@ -1,0 +1,9 @@
+# Okur — Chatterbox TTS sunucusu bagimliliklari
+# GPU'nuz varsa PyTorch'un CUDA surumunu https://pytorch.org talimatiyla kurun.
+# CPU da calisir (yavas). Model agirliklari ilk calistirmada indirilir (~birkac GB).
+chatterbox-tts
+soundfile
+# torch ve torchaudio genellikle chatterbox-tts ile birlikte gelir;
+# gelmezse asagidakileri acin:
+# torch
+# torchaudio

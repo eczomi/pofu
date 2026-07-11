@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src http://127.0.0.1:* http://localhost:*; media-src 'self' blob: data:; font-src 'self';" />
+  <link rel="stylesheet" href="face.css" />
+  <title>Okur</title>
+</head>
+<body>
+  <div id="app">
+    <!-- Pencereyi tasimak icin tutamac -->
+    <div id="grip" title="Suru buradan tut ve tasi">⠿</div>
+
+    <!-- Yuvarlak surat: tiklayinca oku/duraklat -->
+    <div id="face" class="idle" title="Tikla: oku / duraklat">
+      <div id="ring"></div>
+      <img id="faceImg" src="../assets/face.png" alt="" />
+      <div id="fallbackFace">🐣</div>
+      <div id="cueBadge"></div>
+    </div>
+
+    <!-- Kontroller -->
+    <div id="controls">
+      <button id="btnMute" class="ctl" title="Sustur / Aç (hiçbir şey okuma)">🔊</button>
+      <button id="btnToggle" class="ctl" title="Oku / Duraklat">▶</button>
+      <button id="btnStop" class="ctl" title="Durdur">■</button>
+      <button id="btnSettings" class="ctl" title="Ayarlar">⚙</button>
+    </div>
+
+    <!-- Okunan metin: "lighter" ile aydinlatilmis son konum -->
+    <div id="caption" class="hidden">
+      <div id="lines"></div>
+    </div>
+
+    <!-- Ayarlar paneli -->
+    <div id="settings" class="hidden">
+      <div class="srow">
+        <label>Motor</label>
+        <select id="setEngine">
+          <option value="auto">Otomatik</option>
+          <option value="browser">Tarayici sesi</option>
+          <option value="chatterbox">Chatterbox</option>
+        </select>
+      </div>
+      <div class="srow">
+        <label>Ne okunsun</label>
+        <select id="setScope">
+          <option value="lastParagraph">Son paragraf (özet)</option>
+          <option value="lastSentence">Son cümle</option>
+          <option value="all">Tümü</option>
+        </select>
+      </div>
+      <div class="srow">
+        <label>Dil</label>
+        <select id="setLang"></select>
+      </div>
+      <div class="srow">
+        <label>Ses</label>
+        <select id="setVoice"></select>
+      </div>
+      <div class="srow">
+        <label>Hiz</label>
+        <input id="setRate" type="range" min="0.6" max="1.8" step="0.05" />
+        <span id="rateVal" class="hint">1.0x</span>
+      </div>
+      <div class="srow check">
+        <label><input id="setAutoRead" type="checkbox" /> Gelince otomatik oku</label>
+      </div>
+      <div class="srow check">
+        <label><input id="setSkipCode" type="checkbox" /> Kod bloklarini atla</label>
+      </div>
+      <div class="srow check">
+        <label><input id="setCueSound" type="checkbox" /> Bildirim sesi (Bitti / Soru)</label>
+      </div>
+      <div class="srow check">
+        <label><input id="setCueFlash" type="checkbox" /> Titreme / yanip sonme</label>
+      </div>
+      <div class="srow">
+        <label>Proje suzgeci</label>
+        <input id="setFilter" type="text" placeholder="hepsi (bos birak)" />
+      </div>
+      <div class="srow foot">
+        <span id="status" class="hint"></span>
+        <button id="btnQuit" class="ctl danger" title="Uygulamadan cik">Cikis</button>
+      </div>
+    </div>
+  </div>
+  <script src="face.js"></script>
+</body>
+</html>

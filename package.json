@@ -1,0 +1,24 @@
+{
+  "name": "okur",
+  "productName": "Okur",
+  "version": "0.1.0",
+  "description": "Claude'un cevaplarini sesli okuyan, ekranda her seyin ustunde yuzen minik bir surat.",
+  "main": "main.js",
+  "scripts": {
+    "start": "node launch.js",
+    "start:direct": "electron .",
+    "dist": "electron-builder"
+  },
+  "keywords": [
+    "claude",
+    "tts",
+    "text-to-speech",
+    "electron",
+    "assistant"
+  ],
+  "author": "eczomi",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^32.0.0"
+  }
+}
