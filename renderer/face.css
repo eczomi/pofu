@@ -452,6 +452,17 @@ button, select, input, textarea, .sheet, #face {
 .srow.foot { justify-content: space-between; margin-top: 8px; }
 .srow.foot .hint { margin-top: 0; }
 
+/* --- Mini mod: cift tik -> yalniz kucuk maskot --- */
+#app.mini { padding: 4px; align-items: center; }
+#app.mini #grip,
+#app.mini #headRight,
+#app.mini .sheet,
+#app.mini #cueBadge { display: none !important; }
+#app.mini #header { padding: 0; gap: 0; }
+#app.mini #stage { width: 64px; height: 64px; }
+#app.mini #face { width: 56px; height: 56px; }
+#app.mini #halo { inset: -7px; }
+
 /* Azaltilmis hareket */
 @media (prefers-reduced-motion: reduce) {
   #halo, #face.speaking #ring, .sbar::after, .s-approval .sdot,

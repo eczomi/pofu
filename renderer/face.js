@@ -567,11 +567,62 @@ function applyConfigToUI() {
   $('#setReadOnCopy').checked = !!cfg.readOnCopy;
   setHotkeyHint(cfg.hotkey, undefined);
   applyMuted(!!cfg.muted);
+  applyMini(!!cfg.miniMode);
 }
 
 function save(partial) {
   cfg = { ...cfg, ...partial };
   window.okur.saveConfig(partial);
+}
+
+// ---- Maskot jestleri: tut-tasi / tek tik = oynat-duraklat / cift tik = mini mod ----
+function applyMini(m) {
+  cfg.miniMode = !!m;
+  document.getElementById('app').classList.toggle('mini', !!m);
+  requestResize();
+}
+
+function toggleMini() {
+  const m = !cfg.miniMode;
+  applyMini(m);
+  window.okur.saveConfig({ miniMode: m });
+}
+
+function bindFaceGestures() {
+  const face = $('#face');
+  let drag = null;
+  let tapTimer = null;
+
+  face.addEventListener('mousedown', async (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const pos = await window.okur.getWinPos();
+    drag = { sx: e.screenX, sy: e.screenY, wx: pos[0], wy: pos[1], moved: false };
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!drag) return;
+    const dx = e.screenX - drag.sx;
+    const dy = e.screenY - drag.sy;
+    if (!drag.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) drag.moved = true;
+    if (drag.moved) window.okur.moveWin(drag.wx + dx, drag.wy + dy);
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (!drag) return;
+    const wasDrag = drag.moved;
+    drag = null;
+    if (wasDrag) return; // tasima — tik degil
+    if (tapTimer) {
+      // ikinci tik: cift tik -> mini mod
+      clearTimeout(tapTimer);
+      tapTimer = null;
+      toggleMini();
+    } else {
+      // tek tik (cift tik icin kisa bekle)
+      tapTimer = setTimeout(() => { tapTimer = null; toggle(); }, 280);
+    }
+  });
 }
 
 function bindUI() {
@@ -582,7 +633,7 @@ function bindUI() {
     $('#fallbackFace').classList.add('show');
   });
 
-  $('#face').addEventListener('click', toggle);
+  bindFaceGestures();
   $('#btnMute').addEventListener('click', (e) => { e.stopPropagation(); toggleMute(); });
   $('#btnToggle').addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
   $('#btnStop').addEventListener('click', stopAll);
@@ -652,6 +703,8 @@ window.okur.onCommand((msg) => {
 // Pencereyi icerige gore boyutla (bos/seffaf alan tiklama yutmasin).
 // Debounce'lu: kucuk oynamalarda surekli resize atma (surukleme rahat kalsin).
 let lastH = 0;
+let lastW = 0;
+function contentWidth() { return cfg.miniMode ? 84 : 296; }
 let resizeTimer = null;
 function requestResize() {
   clearTimeout(resizeTimer);
@@ -659,9 +712,11 @@ function requestResize() {
     const app = document.getElementById('app');
     if (!app) return;
     const h = Math.ceil(app.getBoundingClientRect().height) + 4;
-    if (Math.abs(h - lastH) > 6) {
+    const w = contentWidth();
+    if (Math.abs(h - lastH) > 6 || w !== lastW) {
       lastH = h;
-      window.okur.resize(h);
+      lastW = w;
+      window.okur.resize(h, w);
     }
   }, 180);
 }

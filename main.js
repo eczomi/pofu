@@ -28,6 +28,7 @@ const DEFAULT_CONFIG = {
   hotkey: 'CommandOrControl+Alt+S',        // secili/pano metni okuma kisayolu
   httpPort: 7889,                          // taray ici uzanti buraya metin yollar (sag tik -> Oku)
   readOnCopy: true,                        // sec + kopyala (Ctrl+C) -> otomatik oku
+  miniMode: false,                         // cift tik: yalniz maskot (mini) modu
   cfgVersion: 3,                           // ayar goc surumu
   x: null, y: null,                        // pencere konumu (hafiza)
 };
@@ -142,21 +143,22 @@ function createWindow() {
 
 // Surukleme bittikten sonra bekleyen boyutlandirmayi uygula
 let dragUntil = 0;
-let pendingHeight = null;
+let pendingSize = null;
 let pendingTimer = null;
-function applyResize(h) {
+function applyResize(h, w) {
   if (!win || win.isDestroyed()) return;
   if (Date.now() < dragUntil) {
-    pendingHeight = h;
+    pendingSize = { h, w };
     clearTimeout(pendingTimer);
     pendingTimer = setTimeout(() => {
-      if (pendingHeight != null) { const p = pendingHeight; pendingHeight = null; applyResize(p); }
+      if (pendingSize) { const p = pendingSize; pendingSize = null; applyResize(p.h, p.w); }
     }, 750);
     return;
   }
-  const [w, curH] = win.getContentSize();
-  if (Math.abs(curH - h) < 6) return; // minik oynamalari yok say
-  win.setContentSize(w, h);
+  const [curW, curH] = win.getContentSize();
+  const newW = w || curW;
+  if (Math.abs(curH - h) < 6 && Math.abs(curW - newW) < 6) return; // minik oynamalar
+  win.setContentSize(newW, h);
 }
 
 // "Windows ile baslat" ozelligi kaldirildi — eski kayit varsa temizle.
@@ -174,7 +176,9 @@ function cleanupLoginItem() {
 // Kurulu degilse sessizce atlanir; tarayici sesi calismaya devam eder.
 let ttsProc = null;
 function startTtsServer() {
-  const py = path.join(__dirname, 'chatterbox-server', '.venv', 'Scripts', 'python.exe');
+  const py = process.platform === 'win32'
+    ? path.join(__dirname, 'chatterbox-server', '.venv', 'Scripts', 'python.exe')
+    : path.join(__dirname, 'chatterbox-server', '.venv', 'bin', 'python');
   const script = path.join(__dirname, 'chatterbox-server', 'server.py');
   if (!fs.existsSync(py) || !fs.existsSync(script)) { dlog('ses sunucusu: venv yok, atlandi'); return; }
   try {
@@ -398,6 +402,31 @@ function startWatcher() {
 }
 
 // Oturumun VS Code penceresine odaklan (baslikta proje adini ara).
+// Baslikta proje adi yoksa (or. isimsiz calisma alani "Untitled (Workspace)")
+// herhangi bir VS Code penceresine odaklan.
+function focusWindows(needle, cb) {
+  const script = path.join(__dirname, 'src', 'focus-window.ps1');
+  const { execFile } = require('child_process');
+  execFile('powershell.exe',
+    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, needle],
+    { windowsHide: true },
+    (err, out) => cb(err ? 'err' : String(out).trim()));
+}
+
+function focusMac(needle) {
+  const { execFile } = require('child_process');
+  const safe = String(needle).replace(/["\\]/g, '');
+  const osa = [
+    'tell application "Visual Studio Code" to activate',
+    'tell application "System Events" to tell process "Code"',
+    '  repeat with w in windows',
+    `    if name of w contains "${safe}" then perform action "AXRaise" of w`,
+    '  end repeat',
+    'end tell',
+  ].join('\n');
+  execFile('osascript', ['-e', osa], (err) => dlog('focus(mac):', needle, err ? err.message : 'ok'));
+}
+
 function focusSession(id) {
   const s = sessions.get(id);
   if (!s) return;
@@ -405,12 +434,16 @@ function focusSession(id) {
   if (s.cwd) { try { needle = path.basename(s.cwd); } catch { needle = ''; } }
   if (!needle) needle = (s.label || '').replace(/ \d+$/, '');
   if (!needle) return;
-  const script = path.join(__dirname, 'src', 'focus-window.ps1');
-  const { execFile } = require('child_process');
-  execFile('powershell.exe',
-    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, needle],
-    { windowsHide: true },
-    (err, out) => dlog('focus:', needle, err ? err.message : String(out).trim()));
+
+  if (process.platform === 'darwin') { focusMac(needle); return; }
+
+  focusWindows(needle, (r1) => {
+    dlog('focus:', needle, r1);
+    if (r1 === 'notfound') {
+      // Proje adi baslikta yok -> en azindan VS Code'a git
+      focusWindows('Visual Studio Code', (r2) => dlog('focus fallback:', r2));
+    }
+  });
 }
 
 // Kullanicinin secip istedigi metni HEMEN okur (otomatik okuma/sustur'u yok sayar).
@@ -493,12 +526,21 @@ ipcMain.on('focus-session', (_e, payload) => {
   if (payload && payload.id) focusSession(payload.id);
 });
 
-// Icerik yuksekligi degisti -> pencereyi icerige gore boyutla
+// Maskottan tutup tasima (renderer elle surukler)
+ipcMain.handle('win-pos', () => (win && !win.isDestroyed()) ? win.getPosition() : [0, 0]);
+ipcMain.on('win-move', (_e, p) => {
+  if (!win || win.isDestroyed() || !p) return;
+  dragUntil = Date.now() + 700; // tasima sirasinda resize erteleme
+  win.setPosition(Math.round(p.x), Math.round(p.y));
+});
+
+// Icerik boyutu degisti -> pencereyi icerige gore boyutla
 // (surukleme sirasinda applyResize erteler — donma yok)
 ipcMain.on('resize', (_e, payload) => {
   if (!payload) return;
-  const h = Math.max(150, Math.min(700, Math.round(payload.height || 0)));
-  applyResize(h);
+  const h = Math.max(70, Math.min(700, Math.round(payload.height || 0)));
+  const w = payload.width ? Math.max(70, Math.min(400, Math.round(payload.width))) : null;
+  applyResize(h, w);
 });
 
 ipcMain.on('state', () => { /* ileride tray ipucu guncellenebilir */ });
