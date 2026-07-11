@@ -61,8 +61,8 @@ function assetPath(name) {
 }
 
 function createWindow() {
-  const W = 320;
-  const H = 400;
+  const W = 296;
+  const H = 320;
   const area = screen.getPrimaryDisplay().workAreaSize;
   const x = config.x != null ? config.x : area.width - W - 28;
   const y = config.y != null ? config.y : 90;
@@ -161,14 +161,48 @@ const fileLabels = new Map();
 const projectSeq = new Map();
 function labelFor(file, cwd) {
   if (fileLabels.has(file)) return fileLabels.get(file);
-  let name = 'Claude';
-  if (cwd) { try { name = path.basename(cwd) || cwd; } catch { name = cwd; } }
+  if (!cwd) return ''; // cwd henuz bilinmiyorsa etiketi sabitleme
+  let name;
+  try { name = path.basename(cwd) || cwd; } catch { name = cwd; }
   const n = (projectSeq.get(name) || 0) + 1;
   projectSeq.set(name, n);
   const label = n > 1 ? `${name} ${n}` : name;
   fileLabels.set(file, label);
   return label;
 }
+
+// ---- Oturum durumu (calisiyor / onay bekliyor / bitti) ----
+const sessions = new Map(); // file -> { id, label, cwd, status, title, ts, lastActivity }
+
+function touchSession(file, cwd) {
+  let s = sessions.get(file);
+  if (!s) {
+    s = { id: file, label: '', cwd: '', status: 'working', title: '', ts: Date.now(), lastActivity: Date.now() };
+    sessions.set(file, s);
+  }
+  if (cwd && !s.cwd) s.cwd = cwd;
+  if (!s.label) s.label = labelFor(file, s.cwd);
+  return s;
+}
+
+function sendSessions() {
+  if (!win || win.isDestroyed()) return;
+  const list = [...sessions.values()].map((s) => ({
+    id: s.id, label: s.label || '…', status: s.status, title: s.title || '', ts: s.ts,
+  }));
+  win.webContents.send('sessions', list);
+  dlog('sessions:', list.map((s) => `${s.label}=${s.status}`).join(', ') || '(bos)');
+}
+
+// 45 dk hareketsiz oturumlari listeden dusur
+setInterval(() => {
+  const cutoff = Date.now() - 45 * 60 * 1000;
+  let changed = false;
+  for (const [f, s] of sessions) {
+    if (s.lastActivity < cutoff) { sessions.delete(f); changed = true; }
+  }
+  if (changed) sendSessions();
+}, 60 * 1000);
 
 // Debounce tamponu: Claude yanitini adim adim yazar (araclar arasinda). Her
 // parcada tetiklemek yerine, belli bir sure yeni metin gelmezse yanit "bitti"
@@ -225,23 +259,67 @@ function flush(file) {
 
   const last = sentences[sentences.length - 1].trim();
   const kind = classifyKind(scoped, last);
-  const label = labelFor(file, cwd);
   const title = makeTitle(sentences);
+
+  // Oturum durumunu guncelle: yanit bitti -> done ya da approval
+  const s = touchSession(file, cwd);
+  s.status = kind;
+  s.title = title;
+  s.ts = Date.now();
+  const label = s.label || 'Claude';
+  sendSessions();
 
   dlog('flush:', label, '| ' + kind, '| ' + sentences.length + ' cumle');
   if (win && !win.isDestroyed()) {
-    win.webContents.send('read', { sentences, lang, label, kind, title, isQuestion: kind === 'approval' });
+    win.webContents.send('read', { id: file, sentences, lang, label, kind, title, isQuestion: kind === 'approval' });
   }
 }
 
 function startWatcher() {
   if (watcher) watcher.stop();
   clearBuffers();
+  sessions.clear();
   watcher = new TranscriptWatcher({
     projectFilter: config.projectFilter,
     onText: onAssistantText,
+    onActivity: ({ file, cwd }) => {
+      // Dosya buyudu = o oturumda is donuyor (arac, dusunme, kullanici...).
+      const s = touchSession(file, cwd);
+      s.lastActivity = Date.now();
+      if (!s.label) s.label = labelFor(file, s.cwd || cwd);
+      // Aktivite surdukce yanit "bitti" sayilmaz: bekleyen flush'i ertele.
+      const b = buffers.get(file);
+      if (b && b.timer && b.items.length) {
+        clearTimeout(b.timer);
+        b.timer = setTimeout(() => flush(file), Math.max(500, config.settleMs || 2500));
+      }
+      if (s.status !== 'working') {
+        s.status = 'working';
+        s.ts = Date.now();
+        sendSessions();
+      } else if (s._new !== false) {
+        s._new = false;
+        sendSessions();
+      }
+    },
   });
   watcher.start();
+}
+
+// Oturumun VS Code penceresine odaklan (baslikta proje adini ara).
+function focusSession(id) {
+  const s = sessions.get(id);
+  if (!s) return;
+  let needle = '';
+  if (s.cwd) { try { needle = path.basename(s.cwd); } catch { needle = ''; } }
+  if (!needle) needle = (s.label || '').replace(/ \d+$/, '');
+  if (!needle) return;
+  const script = path.join(__dirname, 'src', 'focus-window.ps1');
+  const { execFile } = require('child_process');
+  execFile('powershell.exe',
+    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, needle],
+    { windowsHide: true },
+    (err, out) => dlog('focus:', needle, err ? err.message : String(out).trim()));
 }
 
 // Kullanicinin secip istedigi metni HEMEN okur (otomatik okuma/sustur'u yok sayar).
@@ -316,6 +394,20 @@ ipcMain.on('renderer-ready', (e) => {
   e.sender.send('config', config);
   e.sender.send('command', { action: 'hotkey', ok: hotkeyOk, hotkey: config.hotkey });
   startWatcher();
+  sendSessions();
+});
+
+// Oturum satirina tiklandi -> o VS Code penceresine git
+ipcMain.on('focus-session', (_e, payload) => {
+  if (payload && payload.id) focusSession(payload.id);
+});
+
+// Icerik yuksekligi degisti -> pencereyi icerige gore boyutla
+ipcMain.on('resize', (_e, payload) => {
+  if (!win || win.isDestroyed() || !payload) return;
+  const h = Math.max(150, Math.min(700, Math.round(payload.height || 0)));
+  const [w] = win.getContentSize();
+  win.setContentSize(w, h);
 });
 
 ipcMain.on('state', () => { /* ileride tray ipucu guncellenebilir */ });

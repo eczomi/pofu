@@ -340,9 +340,12 @@ function toggleMute() {
   window.okur.saveConfig({ muted: m });
 }
 
-const STATUS_TEXT = { approval: 'onay bekliyor', done: 'konuşma sonlandı' };
+const STATUS_TEXT = { working: 'çalışıyor', approval: 'onay bekliyor', done: 'bitti' };
 
-// Bir metni HEMEN oku (sağ tık / kısayol / bildirime tıklama) + ne okunduğunu yaz.
+// Her oturumun son mesaji (dinle dugmesi icin)
+const lastMsgs = new Map(); // id -> { sentences, lang, label, title }
+
+// Bir metni HEMEN oku (sağ tık / kısayol / oturum dinle) + ne okunduğunu yaz.
 function readNow(list, lang, label, title) {
   const nr = $('#nowReading');
   if (nr) nr.textContent = title ? ('Okunuyor: ' + title) : (label || '');
@@ -364,50 +367,94 @@ function onRead(msg) {
     return;
   }
 
-  // Otomatik yanıt: METİN bildirimi + görsel her zaman; SES yalnız autoRead && !muted.
-  addNotification({ label, kind: msg.kind || 'done', title: msg.title || '', sentences: list, lang: language });
+  // Otomatik yanıt: oturum satırı ana bildirimdir (sessions event'i günceller).
+  // Burada: son mesajı sakla + kısa görsel ipucu + isteğe bağlı sesli okuma.
+  if (msg.id) lastMsgs.set(msg.id, { sentences: list, lang: language, label, title: msg.title || '' });
   playCue(msg.kind === 'approval', language, label);
   if (cfg.autoRead && !cfg.muted && state === 'idle') {
     setTimeout(() => { if (state === 'idle') readNow(list, language, label, msg.title || ''); }, cfg.cueSound ? 650 : 150);
   }
 }
 
-// ---- Bildirim akışı ----
-function addNotification(n) {
-  const listEl = $('#feedList');
-  if (!listEl) return;
-  const row = document.createElement('div');
-  row.className = 'notif k-' + (n.kind || 'done');
-  row.title = 'Dinlemek için tıkla';
+// ---- Oturum barı ----
+const LISTEN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>';
 
-  const time = new Date();
-  const hh = String(time.getHours()).padStart(2, '0');
-  const mm = String(time.getMinutes()).padStart(2, '0');
+function fmtTime(ts) {
+  const d = new Date(ts || Date.now());
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
 
-  const head = document.createElement('div');
-  head.className = 'nhead';
-  head.innerHTML =
-    '<span class="ndot"></span>' +
-    '<span class="nlabel"></span>' +
-    '<span class="nstatus"></span>' +
-    '<span class="ntime"></span>';
-  head.querySelector('.nlabel').textContent = n.label;
-  head.querySelector('.nstatus').textContent = STATUS_TEXT[n.kind] || STATUS_TEXT.done;
-  head.querySelector('.ntime').textContent = hh + ':' + mm;
+function renderSessions(list) {
+  const wrap = $('#sessions');
+  const listEl = $('#sessionList');
+  if (!wrap || !listEl) return;
+  listEl.innerHTML = '';
 
-  const ttl = document.createElement('div');
-  ttl.className = 'ntitle';
-  ttl.textContent = n.title || '';
+  const order = { approval: 0, working: 1, done: 2 };
+  const sorted = (list || []).slice().sort((a, b) =>
+    (order[a.status] ?? 3) - (order[b.status] ?? 3) || (b.ts || 0) - (a.ts || 0));
 
-  row.appendChild(head);
-  if (n.title) row.appendChild(ttl);
-  row.addEventListener('click', () => readNow(n.sentences, n.lang, n.label, n.title || ''));
+  for (const s of sorted) {
+    const row = document.createElement('div');
+    row.className = 'session s-' + (s.status || 'done');
+    row.title = 'Tıkla: bu pencereye git';
 
-  listEl.insertBefore(row, listEl.firstChild);
-  $('#feed').classList.remove('hidden');
+    const head = document.createElement('div');
+    head.className = 'shead';
 
-  // En fazla 14 bildirim tut
-  while (listEl.children.length > 14) listEl.removeChild(listEl.lastChild);
+    const dot = document.createElement('span');
+    dot.className = 'sdot';
+
+    const name = document.createElement('span');
+    name.className = 'sname';
+    name.textContent = s.label || '…';
+
+    const st = document.createElement('span');
+    st.className = 'sstate';
+    st.textContent = STATUS_TEXT[s.status] || s.status;
+
+    const time = document.createElement('span');
+    time.className = 'stime';
+    time.textContent = fmtTime(s.ts);
+
+    head.appendChild(dot);
+    head.appendChild(name);
+    head.appendChild(st);
+    head.appendChild(time);
+
+    // Dinle dugmesi: son mesaji sesli oku (satir tiklamasini engelle)
+    if (lastMsgs.has(s.id)) {
+      const btn = document.createElement('button');
+      btn.className = 'slisten';
+      btn.title = 'Son mesajı dinle';
+      btn.innerHTML = LISTEN_SVG;
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const m = lastMsgs.get(s.id);
+        if (m) readNow(m.sentences, m.lang, m.label, m.title);
+      });
+      head.appendChild(btn);
+    }
+
+    row.appendChild(head);
+
+    if (s.status === 'working') {
+      const bar = document.createElement('div');
+      bar.className = 'sbar';
+      row.appendChild(bar);
+    } else if (s.title) {
+      const ttl = document.createElement('div');
+      ttl.className = 'stitle';
+      ttl.textContent = s.title;
+      row.appendChild(ttl);
+    }
+
+    // Satira tikla -> o VS Code penceresine git
+    row.addEventListener('click', () => window.okur.focusSession(s.id));
+    listEl.appendChild(row);
+  }
+
+  wrap.classList.toggle('hidden', sorted.length === 0);
 }
 
 // ---- Durum yazisi ----
@@ -543,6 +590,7 @@ window.okur.onConfig((c) => {
   updateStatus();
 });
 window.okur.onRead(onRead);
+window.okur.onSessions(renderSessions);
 window.okur.onCommand((msg) => {
   const action = msg && msg.action;
   if (action === 'toggle') toggle();
@@ -552,9 +600,26 @@ window.okur.onCommand((msg) => {
   else if (action === 'hotkey') setHotkeyHint(msg.hotkey, msg.ok);
 });
 
+// Pencereyi icerige gore boyutla (bos/seffaf alan tiklama yutmasin)
+let lastH = 0;
+function requestResize() {
+  const app = document.getElementById('app');
+  if (!app) return;
+  const h = Math.ceil(app.getBoundingClientRect().height) + 4;
+  if (Math.abs(h - lastH) > 3) {
+    lastH = h;
+    window.okur.resize(h);
+  }
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   bindUI();
   if (window.speechSynthesis) speechSynthesis.getVoices();
   updateToggleBtn();
+  try {
+    const ro = new ResizeObserver(() => requestAnimationFrame(requestResize));
+    ro.observe(document.getElementById('app'));
+  } catch { /* eski runtime */ }
   window.okur.ready();
+  requestResize();
 });

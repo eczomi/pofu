@@ -18,12 +18,14 @@ class TranscriptWatcher {
     opts = opts || {};
     this.root = opts.root || projectsRoot();
     this.onText = opts.onText || function () {};
+    this.onActivity = opts.onActivity || function () {}; // dosya buyudu = oturum calisiyor
     this.pollMs = opts.pollMs || 1200;
     this.projectFilter = (opts.projectFilter || '').trim().toLowerCase();
     this.startTime = Date.now();
     this.offsets = new Map();   // dosya -> islenen bayt konumu
     this.partials = new Map();  // dosya -> yarim kalan son satir
     this.seen = new Set();      // okunmus assistant uuid'leri
+    this.cwds = new Map();      // dosya -> proje cwd'si (herhangi bir kayittan)
     this._timer = null;
     this._first = true;
   }
@@ -81,8 +83,13 @@ class TranscriptWatcher {
         off = 0;
         this.partials.set(file, '');
       }
-      if (size > off) this._readChunk(file, off, size);
-      else this.offsets.set(file, size);
+      if (size > off) {
+        this._readChunk(file, off, size);
+        // cwd, _readChunk icindeki satir ayristirmadan gelmis olabilir
+        this.onActivity({ file, cwd: this.cwds.get(file) || '' });
+      } else {
+        this.offsets.set(file, size);
+      }
     }
   }
 
@@ -111,7 +118,9 @@ class TranscriptWatcher {
   _handleLine(line, file) {
     let o;
     try { o = JSON.parse(line); } catch { return; }
-    if (!o || o.type !== 'assistant' || !o.message) return;
+    if (!o) return;
+    if (o.cwd && !this.cwds.has(file)) this.cwds.set(file, o.cwd);
+    if (o.type !== 'assistant' || !o.message) return;
     const uuid = o.uuid;
     if (uuid) {
       if (this.seen.has(uuid)) return;

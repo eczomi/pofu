@@ -8,56 +8,49 @@
   <title>Okur</title>
 </head>
 <body>
-  <!-- Ikonlar: Feather tarzi, cizgi; cevrimdisi/CSP nedeniyle satir ici SVG -->
+  <!-- Arka plan tamamen suruklenebilir; etkilesimli ogeler no-drag -->
   <div id="app">
-    <div id="grip" title="Sürükleyip taşı"><span></span><span></span><span></span></div>
-
-    <!-- Yuvarlak maskot: tıkla = oku / duraklat -->
-    <div id="stage">
-      <div id="halo"></div>
-      <div id="face" class="idle" title="Tıkla: oku / duraklat">
-        <div id="ring"></div>
-        <img id="faceImg" src="../assets/face.png" alt="" />
-        <div id="fallbackFace">🐣</div>
+    <!-- Baslik: maskot + kontroller (yatay, compact) -->
+    <div id="header">
+      <div id="stage">
+        <div id="halo"></div>
+        <div id="face" class="idle" title="Tıkla: oku / duraklat">
+          <div id="ring"></div>
+          <img id="faceImg" src="../assets/face.png" alt="" />
+          <div id="fallbackFace">✨</div>
+        </div>
+        <div id="cueBadge"></div>
       </div>
-      <div id="cueBadge"></div>
+      <div id="headRight">
+        <div id="controls">
+          <button id="btnToggle" class="ctl primary" title="Oku / Duraklat">
+            <svg class="ic ic-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.2v13.6a1 1 0 0 0 1.5.87l11-6.8a1 1 0 0 0 0-1.74l-11-6.8A1 1 0 0 0 8 5.2Z"/></svg>
+            <svg class="ic ic-pause" viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="5" width="3.4" height="14" rx="1.4"/><rect x="13.6" y="5" width="3.4" height="14" rx="1.4"/></svg>
+          </button>
+          <button id="btnStop" class="ctl" title="Durdur">
+            <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="6.5" width="11" height="11" rx="3.2"/></svg>
+          </button>
+          <button id="btnMute" class="ctl" title="Sesi sustur / aç (bildirimler devam eder)">
+            <svg class="ic ic-vol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
+            <svg class="ic ic-mute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="m16.5 9.5 5 5"/><path d="m21.5 9.5-5 5"/></svg>
+          </button>
+          <button id="btnSpeak" class="ctl" title="Metin okut">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 5h15a1 1 0 0 1 1 1v8.5a1 1 0 0 1-1 1H9.5l-4 3.5v-3.5h-1a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/><path d="M10.5 8.6v4.3l3.8-2.15-3.8-2.15Z" fill="currentColor" stroke="none"/></svg>
+          </button>
+          <button id="btnSettings" class="ctl" title="Ayarlar">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .34 1.87l.05.05a2 2 0 1 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.13a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 0 1 0-4h.13a1.7 1.7 0 0 0 1.56-1.11 1.7 1.7 0 0 0-.34-1.87l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05a1.7 1.7 0 0 0 1.87.34h.08A1.7 1.7 0 0 0 10 4.73V4a2 2 0 0 1 4 0v.13a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.05-.05a2 2 0 1 1 2.83 2.83l-.05.05a1.7 1.7 0 0 0-.34 1.87v.08a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 0 1 0 4h-.13a1.7 1.7 0 0 0-1.47 1.06Z"/></svg>
+          </button>
+        </div>
+        <div id="nowReading"></div>
+      </div>
     </div>
 
-    <!-- Okunan oturum çipi -->
-    <div id="nowReading"></div>
-
-    <!-- Kontrol çubuğu -->
-    <div id="controls">
-      <button id="btnMute" class="ctl" title="Sustur / Aç">
-        <svg class="ic ic-vol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.7 6a9 9 0 0 1 0 12"/></svg>
-        <svg class="ic ic-mute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="m16.5 9.5 5 5"/><path d="m21.5 9.5-5 5"/></svg>
-      </button>
-
-      <button id="btnToggle" class="ctl primary" title="Oku / Duraklat">
-        <svg class="ic ic-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.2v13.6a1 1 0 0 0 1.5.87l11-6.8a1 1 0 0 0 0-1.74l-11-6.8A1 1 0 0 0 8 5.2Z"/></svg>
-        <svg class="ic ic-pause" viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="5" width="3.4" height="14" rx="1.4"/><rect x="13.6" y="5" width="3.4" height="14" rx="1.4"/></svg>
-      </button>
-
-      <button id="btnStop" class="ctl" title="Durdur">
-        <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="6.5" width="11" height="11" rx="3.2"/></svg>
-      </button>
-
-      <button id="btnSpeak" class="ctl" title="Seçili metni / panoyu oku">
-        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 5h15a1 1 0 0 1 1 1v8.5a1 1 0 0 1-1 1H9.5l-4 3.5v-3.5h-1a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/><path d="M10.5 8.6v4.3l3.8-2.15-3.8-2.15Z" fill="currentColor" stroke="none"/></svg>
-      </button>
-
-      <button id="btnSettings" class="ctl" title="Ayarlar">
-        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .34 1.87l.05.05a2 2 0 1 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.13a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 0 1 0-4h.13a1.7 1.7 0 0 0 1.56-1.11 1.7 1.7 0 0 0-.34-1.87l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05a1.7 1.7 0 0 0 1.87.34h.08A1.7 1.7 0 0 0 10 4.73V4a2 2 0 0 1 4 0v.13a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.05-.05a2 2 0 1 1 2.83 2.83l-.05.05a1.7 1.7 0 0 0-.34 1.87v.08a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 0 1 0 4h-.13a1.7 1.7 0 0 0-1.47 1.06Z"/></svg>
-      </button>
+    <!-- Oturum bari: hangi sekme calisiyor / onay bekliyor / bitti -->
+    <div id="sessions" class="sheet hidden">
+      <div id="sessionList"></div>
     </div>
 
-    <!-- Bildirim akışı: hangi sekmede ne oldu -->
-    <div id="feed" class="sheet hidden">
-      <div class="feed-head">Bildirimler</div>
-      <div id="feedList"></div>
-    </div>
-
-    <!-- Seçili / yapıştırılan metni okut -->
+    <!-- Metin okut kutusu -->
     <div id="speakBox" class="sheet hidden">
       <textarea id="speakText" placeholder="Okumak istediğin metni buraya yapıştır…"></textarea>
       <div class="speak-actions">
@@ -67,7 +60,7 @@
       <div class="hint" id="hotkeyHint"></div>
     </div>
 
-    <!-- Okunan metin: "lighter" ile aydınlatılmış son konum -->
+    <!-- Okunan metin: isikla aydinlatilmis son konum -->
     <div id="caption" class="sheet hidden">
       <div id="lines"></div>
     </div>
@@ -113,7 +106,7 @@
       </div>
       <div class="srow">
         <label>Kısayol</label>
-        <input id="setHotkey" type="text" placeholder="CommandOrControl+Alt+R" />
+        <input id="setHotkey" type="text" placeholder="CommandOrControl+Alt+S" />
       </div>
       <div class="srow foot">
         <span id="status" class="hint"></span>
