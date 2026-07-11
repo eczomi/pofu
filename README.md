@@ -25,9 +25,10 @@ her uygulamanın üstünde. Sen başka bir işle uğraşırken Claude'un yazdı�
   duraklatınca o satır aydınlık kalır, nerede kaldığını hep bilirsin.
 - 👆 **Tıkla → dur / devam et.** Suratın kendisi duraklat düğmesidir. Altyazıdaki bir
   **satıra tıklarsan oradan okumaya devam eder** (o satır alevle aydınlanır).
-- ✋ **Seçtiğin herhangi bir metni okut** — istediğin yerde (Chrome, PDF, e-posta) metni seç,
-  **kopyala (Ctrl+C)** → Okur okur. "Kopyalayınca oku" ayarı açıksa otomatik; ya da bir
-  **kısayol** (varsayılan `Ctrl+Alt+S`) ile. Yapıştırmaya gerek yok.
+- ✋ **Seçtiğin herhangi bir metni okut** — üç yolla, yapıştırmadan:
+  - **Sağ tık → "Oku (Okur ile)"** — Chrome/Edge'de (küçük uzantıyla, bkz. `browser-extension/`).
+  - **Seç → Ctrl+C** — "Kopyalayınca oku" açıkken her uygulamada (Word, PDF...).
+  - **Kısayol** `Ctrl+Alt+S` — seçili/pano metnini okur.
 - 🔇 **Sustur düğmesi** — canını sıkarsa tek tıkla tamamen sustur (surattaki 🔊 düğmesi
   veya sistem tepsisi → Sustur). Uygulama açık kalır ama hiçbir şey okumaz/titremez.
 - 🎬 **Yanıt bitince titrer + yazılı bildirim** — hangi oturumdan geldiğini gösterir
@@ -79,6 +80,12 @@ Göster/Gizle ve Çıkış yapabilirsin.
 
 > **Susturmak için:** surattaki 🔊 düğmesine bas, ya da sistem tepsisindeki (tray) Okur
 > simgesine sağ tıkla → **Sustur**. Tamamen kapatmak için tepsi → **Çıkış** (veya Ayarlar → Çıkış).
+
+### Sağ tık → Oku (Chrome / Edge uzantısı)
+
+Chrome/Edge'de seçili metne **sağ tıkla → "Oku (Okur ile)"** demek için küçük bir uzantı var.
+Kurulum: `chrome://extensions` → Geliştirici modu → **Paketlenmemiş öğe yükle** →
+`browser-extension` klasörünü seç. Detay: [`browser-extension/README.md`](browser-extension/README.md).
 
 ### Daha doğal ses (opsiyonel): Chatterbox
 

@@ -3,6 +3,7 @@
 const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, screen, clipboard, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
 
 const { TranscriptWatcher } = require('./src/transcript');
 const { toSentences, scopedText } = require('./src/clean');
@@ -27,6 +28,7 @@ const DEFAULT_CONFIG = {
   projectFilter: '',                       // yalniz bu proje klasorunu izle ('' = hepsi)
   hotkey: 'CommandOrControl+Alt+S',        // secili/pano metni okuma kisayolu
   readOnCopy: false,                       // sec + kopyala (Ctrl+C) -> otomatik oku
+  httpPort: 7889,                          // taray ici uzanti buraya metin yollar (sag tik -> Oku)
   x: null, y: null,                        // pencere konumu (hafiza)
 };
 
@@ -263,6 +265,41 @@ function registerHotkey() {
   return hotkeyOk;
 }
 
+// Yerel API: tarayici uzantisi (sag tik -> Oku) secili metni buraya POST eder.
+// Yalniz 127.0.0.1 dinler; disari kapali.
+let apiServer = null;
+function startApiServer() {
+  const port = config.httpPort || 7889;
+  try {
+    apiServer = http.createServer((req, res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+      if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+      if (req.method === 'GET' && req.url.startsWith('/health')) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end('{"ok":true}');
+        return;
+      }
+      if (req.method === 'POST' && req.url.startsWith('/read')) {
+        let body = '';
+        req.on('data', (c) => { body += c; if (body.length > 300000) req.destroy(); });
+        req.on('end', () => {
+          let text = '';
+          try { text = (JSON.parse(body || '{}').text) || ''; } catch { text = ''; }
+          manualRead(text);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end('{"ok":true}');
+        });
+        return;
+      }
+      res.writeHead(404); res.end();
+    });
+    apiServer.on('error', (e) => dlog('api server hata:', e.message));
+    apiServer.listen(port, '127.0.0.1', () => dlog('api server dinliyor:', port));
+  } catch (e) { dlog('api server baslatilamadi:', e.message); }
+}
+
 // Pano izleyici: "Kopyalayınca oku" acikken, yeni kopyalanan metni okur.
 function startClipboardWatch() {
   try { lastClip = clipboard.readText() || ''; } catch { lastClip = ''; }
@@ -319,9 +356,13 @@ if (!gotLock) {
     createTray();
     registerHotkey();
     startClipboardWatch();
+    startApiServer();
   });
 
-  app.on('will-quit', () => { try { globalShortcut.unregisterAll(); } catch { /* */ } });
+  app.on('will-quit', () => {
+    try { globalShortcut.unregisterAll(); } catch { /* */ }
+    try { if (apiServer) apiServer.close(); } catch { /* */ }
+  });
 
   // Pencere gizlense de tepside calismaya devam etsin.
   app.on('window-all-closed', () => { /* cikma; tepsiden yonetiliyor */ });

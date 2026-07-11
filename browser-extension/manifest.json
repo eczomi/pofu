@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Okur — Sağ tık Oku",
+  "version": "1.0.0",
+  "description": "Seçili metni sağ tıkla → Okur uygulamasında sesli okut.",
+  "permissions": ["contextMenus"],
+  "host_permissions": ["http://127.0.0.1/*"],
+  "background": { "service_worker": "background.js" },
+  "icons": { "128": "icon128.png" }
+}
