@@ -28,6 +28,8 @@ const DEFAULT_CONFIG = {
   projectFilter: '',                       // yalniz bu proje klasorunu izle ('' = hepsi)
   hotkey: 'CommandOrControl+Alt+S',        // secili/pano metni okuma kisayolu
   httpPort: 7889,                          // taray ici uzanti buraya metin yollar (sag tik -> Oku)
+  startWithWindows: false,                 // Windows acilisinda otomatik baslat
+  cfgVersion: 2,                           // ayar goc surumu
   x: null, y: null,                        // pencere konumu (hafiza)
 };
 
@@ -44,12 +46,20 @@ function configPath() {
 }
 
 function loadConfig() {
+  let c;
   try {
     const raw = fs.readFileSync(configPath(), 'utf8');
-    return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+    c = { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
   } catch {
-    return { ...DEFAULT_CONFIG };
+    c = { ...DEFAULT_CONFIG };
   }
+  // Goc v2: metin-oncelikli surume gecis — eski kayitli autoRead=true'yu bir
+  // kereligine kapat (Sevgi/kullanici sonra ayardan bilincli acabilir).
+  if (!c.cfgVersion || c.cfgVersion < 2) {
+    c.autoRead = false;
+    c.cfgVersion = 2;
+  }
+  return c;
 }
 
 function saveConfig() {
@@ -100,15 +110,61 @@ function createWindow() {
     win.webContents.on('did-finish-load', () => dlog('renderer yuklendi'));
   }
 
-  win.on('moved', () => {
-    if (!win) return;
+  // Suruklerken pencereyi YENIDEN BOYUTLANDIRMA — Windows'ta programatik
+  // boyutlandirma suruklemeyi iptal eder ("donma" hissi). Tasima bitene
+  // kadar boyutlandirmayi ertele.
+  win.on('will-move', () => {
+    dragUntil = Date.now() + 700;
+  });
+
+  let moveSaveTimer = null;
+  const savePos = () => {
+    if (!win || win.isDestroyed()) return;
     const [nx, ny] = win.getPosition();
     config.x = nx;
     config.y = ny;
     saveConfig();
+  };
+  win.on('moved', savePos);
+  win.on('move', () => {
+    dragUntil = Date.now() + 700;
+    clearTimeout(moveSaveTimer);
+    moveSaveTimer = setTimeout(savePos, 400);
   });
 
   win.on('closed', () => { win = null; });
+}
+
+// Surukleme bittikten sonra bekleyen boyutlandirmayi uygula
+let dragUntil = 0;
+let pendingHeight = null;
+let pendingTimer = null;
+function applyResize(h) {
+  if (!win || win.isDestroyed()) return;
+  if (Date.now() < dragUntil) {
+    pendingHeight = h;
+    clearTimeout(pendingTimer);
+    pendingTimer = setTimeout(() => {
+      if (pendingHeight != null) { const p = pendingHeight; pendingHeight = null; applyResize(p); }
+    }, 750);
+    return;
+  }
+  const [w, curH] = win.getContentSize();
+  if (Math.abs(curH - h) < 6) return; // minik oynamalari yok say
+  win.setContentSize(w, h);
+}
+
+// Windows ile baslat (login item)
+function applyLoginItem() {
+  try {
+    const settings = { openAtLogin: !!config.startWithWindows };
+    if (!app.isPackaged) {
+      settings.path = process.execPath;                 // electron.exe
+      settings.args = [path.resolve(__dirname)];        // proje klasoru
+    }
+    app.setLoginItemSettings(settings);
+    dlog('login item:', settings.openAtLogin);
+  } catch { /* yoksay */ }
 }
 
 function createTray() {
@@ -403,11 +459,11 @@ ipcMain.on('focus-session', (_e, payload) => {
 });
 
 // Icerik yuksekligi degisti -> pencereyi icerige gore boyutla
+// (surukleme sirasinda applyResize erteler — donma yok)
 ipcMain.on('resize', (_e, payload) => {
-  if (!win || win.isDestroyed() || !payload) return;
+  if (!payload) return;
   const h = Math.max(150, Math.min(700, Math.round(payload.height || 0)));
-  const [w] = win.getContentSize();
-  win.setContentSize(w, h);
+  applyResize(h);
 });
 
 ipcMain.on('state', () => { /* ileride tray ipucu guncellenebilir */ });
@@ -417,11 +473,14 @@ ipcMain.on('save-config', (_e, partial) => {
     partial.projectFilter !== config.projectFilter;
   const mutedChanged = partial && 'muted' in partial && partial.muted !== config.muted;
   const hotkeyChanged = partial && 'hotkey' in partial && partial.hotkey !== config.hotkey;
+  const loginChanged = partial && 'startWithWindows' in partial &&
+    partial.startWithWindows !== config.startWithWindows;
   config = { ...config, ...partial };
   saveConfig();
   if (mutedChanged) rebuildTrayMenu();
   if (filterChanged) startWatcher();
   if (hotkeyChanged) registerHotkey();
+  if (loginChanged) applyLoginItem();
 });
 
 // Manuel okuma: surattaki kutudan gelen metin ya da pano.

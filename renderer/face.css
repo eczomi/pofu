@@ -41,6 +41,22 @@ button, select, input, textarea, .sheet, #face {
   -webkit-app-region: no-drag;
 }
 
+/* --- Tutma cubugu --- */
+#grip {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 0 7px;
+  cursor: grab;
+}
+#grip span {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+}
+#grip:hover span { background: var(--vio-bright); box-shadow: 0 0 5px var(--vio-glow); }
+#grip:active { cursor: grabbing; }
+
 /* --- Baslik: maskot + kontroller --- */
 #header {
   display: flex;

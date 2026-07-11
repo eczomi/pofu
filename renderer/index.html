@@ -10,6 +10,9 @@
 <body>
   <!-- Arka plan tamamen suruklenebilir; etkilesimli ogeler no-drag -->
   <div id="app">
+    <!-- Tutma cubugu: her zaman gorunur tasima alani -->
+    <div id="grip" title="Tut ve taşı"><span></span><span></span><span></span></div>
+
     <!-- Baslik: maskot + kontroller (yatay, compact) -->
     <div id="header">
       <div id="stage">
@@ -100,6 +103,7 @@
       <div class="srow check"><label><input id="setSkipCode" type="checkbox" /> Kod bloklarını atla</label></div>
       <div class="srow check"><label><input id="setCueSound" type="checkbox" /> Bildirim sesi (Bitti / Soru)</label></div>
       <div class="srow check"><label><input id="setCueFlash" type="checkbox" /> Titreme / yanıp sönme</label></div>
+      <div class="srow check"><label><input id="setStartWin" type="checkbox" /> Windows ile başlat</label></div>
       <div class="srow">
         <label>Proje süzgeci</label>
         <input id="setFilter" type="text" placeholder="hepsi (boş bırak)" />

@@ -51,6 +51,13 @@ npm install
 npm start
 ```
 
+**Kolay çalıştırma (Windows):** her seferinde terminal açmak yerine:
+- **`Okur.vbs`'ye çift tıkla** — konsolsuz açılır. Masaüstüne kısayol at
+  (sağ tık → Kısayol oluştur; ikon olarak `assets\okur.ico` seçebilirsin).
+- Ya da Ayarlar (⚙) → **"Windows ile başlat"** işaretle — bilgisayar her açıldığında
+  Okur kendiliğinden gelir, hep köşede durur.
+- Zaten açıkken tekrar çalıştırırsan ikinci kopya açılmaz, mevcut pencere öne gelir.
+
 Suratı köşeye sürükle (üstteki `⠿` tutamacından). Bir Claude Code oturumu aç, soru sor —
 cevap gelince Okur okumaya başlar. Uygulama sistem tepsisinde (tray) çalışır; oradan
 Göster/Gizle ve Çıkış yapabilirsin.
@@ -69,7 +76,8 @@ Göster/Gizle ve Çıkış yapabilirsin.
 | **Bildirim sesi (Bitti / Soru)** | Sesli "Bitti"/"Soru" bildirimini aç/kapat (varsayılan kapalı) |
 | **Titreme / yanıp sönme** | Görsel bildirimi aç/kapat |
 | **Kısayol** | Seçili/pano metnini okuma kısayolu (varsayılan `Ctrl+Alt+S`) |
-| **Proje süzgeci** | Yalnız belirli bir proje klasörünü izle (boş = tüm aktif oturumlar) |
+| **Proje süzgeci** | Yalnız adı eşleşen projeleri izle. Boş = hepsi. Tek proje: `para-app`. Birden çok: `para-app, okur` (virgülle). Küçük/büyük harf fark etmez, parça eşleşmesi yeter. |
+| **Windows ile başlat** | Bilgisayar açılınca Okur kendiliğinden başlasın |
 
 > **Susturmak için:** surattaki 🔊 düğmesine bas, ya da sistem tepsisindeki (tray) Okur
 > simgesine sağ tıkla → **Sustur**. Tamamen kapatmak için tepsi → **Çıkış** (veya Ayarlar → Çıkış).

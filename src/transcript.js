@@ -20,7 +20,9 @@ class TranscriptWatcher {
     this.onText = opts.onText || function () {};
     this.onActivity = opts.onActivity || function () {}; // dosya buyudu = oturum calisiyor
     this.pollMs = opts.pollMs || 1200;
-    this.projectFilter = (opts.projectFilter || '').trim().toLowerCase();
+    // Virgulle coklu suzgec: "para-app, okur" -> ikisinden birini iceren klasorler
+    this.projectFilters = String(opts.projectFilter || '')
+      .toLowerCase().split(',').map((s) => s.trim()).filter(Boolean);
     this.startTime = Date.now();
     this.offsets = new Map();   // dosya -> islenen bayt konumu
     this.partials = new Map();  // dosya -> yarim kalan son satir
@@ -48,7 +50,8 @@ class TranscriptWatcher {
     const files = [];
     for (const d of dirs) {
       if (!d.isDirectory()) continue;
-      if (this.projectFilter && !d.name.toLowerCase().includes(this.projectFilter)) continue;
+      if (this.projectFilters.length &&
+          !this.projectFilters.some((f) => d.name.toLowerCase().includes(f))) continue;
       const dir = path.join(this.root, d.name);
       let entries;
       try { entries = fs.readdirSync(dir); } catch { continue; }

@@ -524,6 +524,7 @@ function applyConfigToUI() {
   $('#setCueFlash').checked = !!cfg.cueFlash;
   $('#setFilter').value = cfg.projectFilter || '';
   $('#setHotkey').value = cfg.hotkey || '';
+  $('#setStartWin').checked = !!cfg.startWithWindows;
   setHotkeyHint(cfg.hotkey, undefined);
   applyMuted(!!cfg.muted);
 }
@@ -545,11 +546,14 @@ function bindUI() {
   $('#btnMute').addEventListener('click', (e) => { e.stopPropagation(); toggleMute(); });
   $('#btnToggle').addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
   $('#btnStop').addEventListener('click', stopAll);
+  // Ayarlar ve metin kutusu ayni anda acilmasin (compact kalsin)
   $('#btnSettings').addEventListener('click', () => {
+    $('#speakBox').classList.add('hidden');
     $('#settings').classList.toggle('hidden');
   });
   $('#btnSpeak').addEventListener('click', (e) => {
     e.stopPropagation();
+    $('#settings').classList.add('hidden');
     $('#speakBox').classList.toggle('hidden');
     const t = $('#speakText');
     if (!$('#speakBox').classList.contains('hidden') && t) t.focus();
@@ -579,6 +583,7 @@ function bindUI() {
     save({ hotkey: e.target.value.trim() });
     setHotkeyHint(e.target.value.trim(), undefined);
   });
+  $('#setStartWin').addEventListener('change', (e) => save({ startWithWindows: e.target.checked }));
 }
 
 // ---- Baslat ----
@@ -600,16 +605,21 @@ window.okur.onCommand((msg) => {
   else if (action === 'hotkey') setHotkeyHint(msg.hotkey, msg.ok);
 });
 
-// Pencereyi icerige gore boyutla (bos/seffaf alan tiklama yutmasin)
+// Pencereyi icerige gore boyutla (bos/seffaf alan tiklama yutmasin).
+// Debounce'lu: kucuk oynamalarda surekli resize atma (surukleme rahat kalsin).
 let lastH = 0;
+let resizeTimer = null;
 function requestResize() {
-  const app = document.getElementById('app');
-  if (!app) return;
-  const h = Math.ceil(app.getBoundingClientRect().height) + 4;
-  if (Math.abs(h - lastH) > 3) {
-    lastH = h;
-    window.okur.resize(h);
-  }
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    const app = document.getElementById('app');
+    if (!app) return;
+    const h = Math.ceil(app.getBoundingClientRect().height) + 4;
+    if (Math.abs(h - lastH) > 6) {
+      lastH = h;
+      window.okur.resize(h);
+    }
+  }, 180);
 }
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -617,7 +627,7 @@ window.addEventListener('DOMContentLoaded', () => {
   if (window.speechSynthesis) speechSynthesis.getVoices();
   updateToggleBtn();
   try {
-    const ro = new ResizeObserver(() => requestAnimationFrame(requestResize));
+    const ro = new ResizeObserver(requestResize);
     ro.observe(document.getElementById('app'));
   } catch { /* eski runtime */ }
   window.okur.ready();
