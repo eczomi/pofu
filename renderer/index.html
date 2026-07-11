@@ -51,6 +51,12 @@
       </button>
     </div>
 
+    <!-- Bildirim akışı: hangi sekmede ne oldu -->
+    <div id="feed" class="sheet hidden">
+      <div class="feed-head">Bildirimler</div>
+      <div id="feedList"></div>
+    </div>
+
     <!-- Seçili / yapıştırılan metni okut -->
     <div id="speakBox" class="sheet hidden">
       <textarea id="speakText" placeholder="Okumak istediğin metni buraya yapıştır…"></textarea>
@@ -97,11 +103,10 @@
         <input id="setRate" type="range" min="0.6" max="1.8" step="0.05" />
         <span id="rateVal" class="hint">1.0x</span>
       </div>
-      <div class="srow check"><label><input id="setAutoRead" type="checkbox" /> Gelince otomatik oku</label></div>
+      <div class="srow check"><label><input id="setAutoRead" type="checkbox" /> Gelince otomatik SESLİ oku</label></div>
       <div class="srow check"><label><input id="setSkipCode" type="checkbox" /> Kod bloklarını atla</label></div>
       <div class="srow check"><label><input id="setCueSound" type="checkbox" /> Bildirim sesi (Bitti / Soru)</label></div>
       <div class="srow check"><label><input id="setCueFlash" type="checkbox" /> Titreme / yanıp sönme</label></div>
-      <div class="srow check"><label><input id="setReadOnCopy" type="checkbox" /> Kopyalayınca oku (seç → Ctrl+C)</label></div>
       <div class="srow">
         <label>Proje süzgeci</label>
         <input id="setFilter" type="text" placeholder="hepsi (boş bırak)" />

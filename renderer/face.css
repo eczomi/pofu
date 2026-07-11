@@ -250,6 +250,45 @@ html, body {
 .ic-pause, #btnToggle.playing .ic-play { display: none; }
 #btnToggle.playing .ic-pause { display: inline; }
 
+/* --- Bildirim akışı --- */
+.feed-head {
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  padding: 1px 3px 6px;
+}
+#feed { max-height: 200px; overflow-y: auto; scrollbar-width: thin; }
+#feed::-webkit-scrollbar { width: 6px; }
+#feed::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 3px; }
+.notif {
+  padding: 6px 7px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.16s;
+}
+.notif + .notif { margin-top: 2px; }
+.notif:hover { background: rgba(246, 167, 66, 0.09); }
+.nhead { display: flex; align-items: center; gap: 7px; }
+.ndot {
+  flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--ink-faint);
+}
+.k-approval .ndot {
+  background: var(--ember-bright);
+  box-shadow: 0 0 8px var(--ember-bright);
+  animation: emberPulse 1.2s ease-in-out infinite;
+}
+.nlabel { font-size: 12px; font-weight: 700; color: var(--ink); }
+.nstatus { font-size: 11.5px; }
+.k-approval .nstatus { color: var(--ember-bright); font-weight: 600; }
+.k-done .nstatus { color: var(--ink-dim); }
+.ntime { margin-left: auto; font-size: 10px; color: var(--ink-faint); }
+.ntitle {
+  font-size: 11px; color: var(--ink-dim);
+  margin: 3px 0 0 15px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
 /* --- Cam sayfalar (altyazı / ayar / kutu) --- */
 .sheet {
   -webkit-app-region: no-drag;

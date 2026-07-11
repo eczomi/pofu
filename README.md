@@ -16,29 +16,22 @@ her uygulamanın üstünde. Sen başka bir işle uğraşırken Claude'un yazdı�
 
 ### Ne yapar?
 
-- 🗣️ **Sesli okur** — Claude yanıtı **tamamlandığında** okur (adım adım değil; yanıt
-  gerçekten bitene kadar bekler, sonra bir kez okur).
-- ✂️ **Sadece son özet** — istersen tüm cevabı değil yalnız **son paragrafı** okutabilirsin
-  (Ayarlar → Ne okunsun: Son paragraf / Son cümle / Tümü).
-- 🪄 **Ekranın üstünde yüzer** — Chrome'da, Word'de, neredeysen görünür (her zaman en üstte).
-- 🔥 **"Lighter" ile son kaldığın yeri aydınlatır** — okunan cümle bir alevle işaretlenir;
-  duraklatınca o satır aydınlık kalır, nerede kaldığını hep bilirsin.
-- 👆 **Tıkla → dur / devam et.** Suratın kendisi duraklat düğmesidir. Altyazıdaki bir
-  **satıra tıklarsan oradan okumaya devam eder** (o satır alevle aydınlanır).
-- ✋ **Seçtiğin herhangi bir metni okut** — üç yolla, yapıştırmadan:
-  - **Sağ tık → "Oku (Okur ile)"** — Chrome/Edge'de (küçük uzantıyla, bkz. `browser-extension/`).
-  - **Seç → Ctrl+C** — "Kopyalayınca oku" açıkken her uygulamada (Word, PDF...).
-  - **Kısayol** `Ctrl+Alt+S` — seçili/pano metnini okur.
-- 🔇 **Sustur düğmesi** — canını sıkarsa tek tıkla tamamen sustur (surattaki 🔊 düğmesi
-  veya sistem tepsisi → Sustur). Uygulama açık kalır ama hiçbir şey okumaz/titremez.
-- 🎬 **Yanıt bitince titrer + yazılı bildirim** — hangi oturumdan geldiğini gösterir
-  (örn. `✓ para-app`). **Soru gelince yanıp söner** (`❓ para-app`) — Claude sana bir şey
-  sorduğunda fark edersin. Sesli "Bitti/Soru" isteğe bağlıdır (varsayılan kapalı).
-- 🗂️ **Birden fazla oturum** — birden çok Claude penceresi açıkken her biri ayrı izlenir,
-  bildirimde hangisinin bittiği yazar.
-- 🌍 **Çok dilli** — mesajın dilini otomatik algılar, doğru sesi seçer
-  (Türkçe, İngilizce, Almanca, Fransızca, İspanyolca, Rusça, Japonca ve daha fazlası).
-- 🔒 **Gizli** — metin bilgisayarından çıkmaz. Tarayıcı sesi (varsayılan) tamamen çevrimdışıdır.
+- 🔔 **Metinli bildirim merkezi (asıl özellik)** — birden çok Claude penceresi/sekmesinde
+  çalışırken ekrana dönmeden göz at: hangi sekmede **"onay bekliyor"**, hangisinde
+  **"konuşma sonlandı"** — proje adı + saatle. Sese güvenmene gerek yok; sesler karışmaz.
+- 🗂️ **Birden fazla oturum** — her Claude penceresi ayrı izlenir; bildirimde hangisi
+  olduğu yazar (örn. `para-app`, `web-proje 2`).
+- ✋ **Seçtiğin metni okut (sağ tık)** — herhangi bir web sayfası/kitap/PDF'te metni seç,
+  **sağ tık → "Oku"** (Chrome/Edge uzantısı) → minik ajan okur, **ne okuduğunu** üstünde
+  kısaca yazar. Kısayol da var (`Ctrl+Alt+S`). Yapıştırma yok.
+- 🔥 **"Lighter" ile son kaldığın yeri aydınlatır** — okunan cümle bir alevle işaretlenir.
+- 👆 **Tıkla → dur / devam.** Bildirimlerden birine tıklarsan onu sesli dinlersin.
+- 🪄 **Ekranın üstünde yüzer** — neredeysen görünür (her zaman en üstte).
+- 🔇 **Sustur = yalnız ses susar**, metin bildirimleri gelmeye devam eder.
+- 🗣️ **İsteğe bağlı otomatik sesli okuma** — istersen aç (Ayarlar → Gelince otomatik SESLİ oku);
+  varsayılan kapalı (metin öncelikli). Yanıt **tamamlanınca** bir kez okur, son özetini.
+- 🌍 **Çok dilli** — mesajın dilini otomatik algılar, doğru sesi seçer.
+- 🔒 **Gizli** — metin bilgisayarından çıkmaz. Tarayıcı sesi tamamen çevrimdışıdır.
 
 ### Nasıl çalışır?
 
@@ -70,11 +63,10 @@ Göster/Gizle ve Çıkış yapabilirsin.
 | **Dil** | Otomatik (mesajdan algıla) veya sabit bir dil |
 | **Ses** | Belirli bir işletim sistemi sesi seç |
 | **Hız** | Konuşma hızı |
-| **Gelince otomatik oku** | Yanıt bitince kendiliğinden okusun mu |
+| **Gelince otomatik SESLİ oku** | Yanıt bitince kendiliğinden sesli okusun mu (varsayılan **kapalı**) |
 | **Kod bloklarını atla** | Kodu sesli okumasın (önerilir) |
 | **Bildirim sesi (Bitti / Soru)** | Sesli "Bitti"/"Soru" bildirimini aç/kapat (varsayılan kapalı) |
-| **Titreme / yanıp sönme** | Görsel + yazılı bildirimi aç/kapat |
-| **Kopyalayınca oku** | Seç → Ctrl+C → otomatik oku (yapıştırmadan) |
+| **Titreme / yanıp sönme** | Görsel bildirimi aç/kapat |
 | **Kısayol** | Seçili/pano metnini okuma kısayolu (varsayılan `Ctrl+Alt+S`) |
 | **Proje süzgeci** | Yalnız belirli bir proje klasörünü izle (boş = tüm aktif oturumlar) |
 

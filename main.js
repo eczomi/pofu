@@ -19,7 +19,7 @@ const DEFAULT_CONFIG = {
   language: 'auto',                        // 'auto' veya 'tr','en','de',... (TTS dili)
   voiceName: '',                           // belirli bir tarayici sesi; '' = otomatik
   skipCode: true,                          // kod bloklarini okuma
-  autoRead: true,                          // yanit bitince kendiliginden oku
+  autoRead: false,                         // metin-oncelikli: varsayilan otomatik SESLI okuma KAPALI
   readScope: 'lastParagraph',              // 'all' | 'lastParagraph' | 'lastSentence' — ne okunsun
   settleMs: 2500,                          // yanit "bitti" sayilmadan once beklenen sessizlik (ms)
   cueSound: false,                         // sesli "Bitti/Soru" bildirimi (varsayilan kapali)
@@ -27,7 +27,6 @@ const DEFAULT_CONFIG = {
   muted: false,                            // ana sustur: acikken hicbir sey okumaz/titremez
   projectFilter: '',                       // yalniz bu proje klasorunu izle ('' = hepsi)
   hotkey: 'CommandOrControl+Alt+S',        // secili/pano metni okuma kisayolu
-  readOnCopy: false,                       // sec + kopyala (Ctrl+C) -> otomatik oku
   httpPort: 7889,                          // taray ici uzanti buraya metin yollar (sag tik -> Oku)
   x: null, y: null,                        // pencere konumu (hafiza)
 };
@@ -38,8 +37,6 @@ let watcher = null;
 let config = { ...DEFAULT_CONFIG };
 let lastLang = 'en';
 let hotkeyOk = false;
-let lastClip = '';
-let clipTimer = null;
 
 function configPath() {
   // Test/tanilama icin OKUR_CONFIG ile ozel dosya gosterilebilir.
@@ -142,9 +139,8 @@ function rebuildTrayMenu() {
 }
 
 function setMuted(m) {
-  config.muted = !!m;
+  config.muted = !!m; // yalniz ses susar; metin bildirimi devam eder
   saveConfig();
-  if (m) clearBuffers();
   if (win && !win.isDestroyed()) win.webContents.send('command', { action: m ? 'muted-on' : 'muted-off' });
   rebuildTrayMenu();
 }
@@ -185,12 +181,26 @@ function clearBuffers() {
 }
 
 function onAssistantText({ text, file, ts, cwd }) {
-  if (config.muted) return; // ana sustur
+  // Not: sustur (muted) yalniz SESI keser; metin bildirimi yine gelir.
   let b = buffers.get(file);
   if (!b) { b = { items: [], timer: null }; buffers.set(file, b); }
   b.items.push({ text, cwd, ts });
   if (b.timer) clearTimeout(b.timer);
   b.timer = setTimeout(() => flush(file), Math.max(500, config.settleMs || 2500));
+}
+
+// Yanit "onay bekliyor" mu yoksa "konusma sonlandi" mi?
+const APPROVAL_RE = /(onayl[ıia]|onay bekl|onaylıyor musun|devam edeyim mi|devam edeyim mı|başlayay[ıi]m m[ıi]|yapay[ıi]m m[ıi]|ister misin|olur mu|emin misin|should i\b|shall i\b|may i\b|proceed\??$|confirm\b|approve\b)/i;
+
+function classifyKind(scoped, lastSentence) {
+  if (/[?？]["')\]]*$/.test(lastSentence)) return 'approval';
+  if (APPROVAL_RE.test(scoped)) return 'approval';
+  return 'done';
+}
+
+function makeTitle(sentences) {
+  const s = (sentences[0] || '').replace(/\s+/g, ' ').trim();
+  return s.length > 54 ? s.slice(0, 52).trim() + '…' : s;
 }
 
 function flush(file) {
@@ -199,7 +209,6 @@ function flush(file) {
   const items = b.items;
   b.items = [];
   b.timer = null;
-  if (config.muted) return;
 
   const scope = config.readScope || 'lastParagraph';
   const cwd = items[items.length - 1].cwd || '';
@@ -215,12 +224,13 @@ function flush(file) {
   if (!lang || lang === 'auto') { lang = detect(scoped, lastLang); lastLang = lang; }
 
   const last = sentences[sentences.length - 1].trim();
-  const isQuestion = /[?？]["')\]]*$/.test(last);
+  const kind = classifyKind(scoped, last);
   const label = labelFor(file, cwd);
+  const title = makeTitle(sentences);
 
-  dlog('flush:', label, '| kapsam=' + scope, '| ' + sentences.length + ' cumle', '| soru=' + isQuestion);
+  dlog('flush:', label, '| ' + kind, '| ' + sentences.length + ' cumle');
   if (win && !win.isDestroyed()) {
-    win.webContents.send('read', { sentences, lang, label, isQuestion });
+    win.webContents.send('read', { sentences, lang, label, kind, title, isQuestion: kind === 'approval' });
   }
 }
 
@@ -243,10 +253,11 @@ function manualRead(rawText) {
   if (!sentences.length) return;
   let lang = config.language;
   if (!lang || lang === 'auto') { lang = detect(text, lastLang); lastLang = lang; }
+  const title = makeTitle(sentences);
   dlog('manuel oku:', sentences.length, 'cumle, lang=' + lang);
   if (win && !win.isDestroyed()) {
     if (!win.isVisible()) win.show();
-    win.webContents.send('read', { sentences, lang, label: 'Seçili metin', isQuestion: false, manual: true });
+    win.webContents.send('read', { sentences, lang, label: 'Seçili metin', title, isQuestion: false, manual: true });
   }
 }
 
@@ -300,20 +311,6 @@ function startApiServer() {
   } catch (e) { dlog('api server baslatilamadi:', e.message); }
 }
 
-// Pano izleyici: "Kopyalayınca oku" acikken, yeni kopyalanan metni okur.
-function startClipboardWatch() {
-  try { lastClip = clipboard.readText() || ''; } catch { lastClip = ''; }
-  if (clipTimer) clearInterval(clipTimer);
-  clipTimer = setInterval(() => {
-    let t = '';
-    try { t = clipboard.readText() || ''; } catch { return; }
-    if (t && t !== lastClip) {
-      lastClip = t;
-      if (config.readOnCopy && !config.muted) manualRead(t);
-    }
-  }, 500);
-}
-
 // ---- IPC ----
 ipcMain.on('renderer-ready', (e) => {
   e.sender.send('config', config);
@@ -330,7 +327,7 @@ ipcMain.on('save-config', (_e, partial) => {
   const hotkeyChanged = partial && 'hotkey' in partial && partial.hotkey !== config.hotkey;
   config = { ...config, ...partial };
   saveConfig();
-  if (mutedChanged) { if (config.muted) clearBuffers(); rebuildTrayMenu(); }
+  if (mutedChanged) rebuildTrayMenu();
   if (filterChanged) startWatcher();
   if (hotkeyChanged) registerHotkey();
 });
@@ -355,7 +352,6 @@ if (!gotLock) {
     createWindow();
     createTray();
     registerHotkey();
-    startClipboardWatch();
     startApiServer();
   });
 
