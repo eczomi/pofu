@@ -23,7 +23,11 @@ her uygulamanın üstünde. Sen başka bir işle uğraşırken Claude'un yazdı�
 - 🪄 **Ekranın üstünde yüzer** — Chrome'da, Word'de, neredeysen görünür (her zaman en üstte).
 - 🔥 **"Lighter" ile son kaldığın yeri aydınlatır** — okunan cümle bir alevle işaretlenir;
   duraklatınca o satır aydınlık kalır, nerede kaldığını hep bilirsin.
-- 👆 **Tıkla → dur / devam et.** Suratın kendisi duraklat düğmesidir.
+- 👆 **Tıkla → dur / devam et.** Suratın kendisi duraklat düğmesidir. Altyazıdaki bir
+  **satıra tıklarsan oradan okumaya devam eder** (o satır alevle aydınlanır).
+- ✋ **Seçtiğin herhangi bir metni okut** — istediğin yerde (Chrome, PDF, e-posta) metni seç,
+  **kopyala (Ctrl+C)** → Okur okur. "Kopyalayınca oku" ayarı açıksa otomatik; ya da bir
+  **kısayol** (varsayılan `Ctrl+Alt+S`) ile. Yapıştırmaya gerek yok.
 - 🔇 **Sustur düğmesi** — canını sıkarsa tek tıkla tamamen sustur (surattaki 🔊 düğmesi
   veya sistem tepsisi → Sustur). Uygulama açık kalır ama hiçbir şey okumaz/titremez.
 - 🎬 **Yanıt bitince titrer + yazılı bildirim** — hangi oturumdan geldiğini gösterir
@@ -69,6 +73,8 @@ Göster/Gizle ve Çıkış yapabilirsin.
 | **Kod bloklarını atla** | Kodu sesli okumasın (önerilir) |
 | **Bildirim sesi (Bitti / Soru)** | Sesli "Bitti"/"Soru" bildirimini aç/kapat (varsayılan kapalı) |
 | **Titreme / yanıp sönme** | Görsel + yazılı bildirimi aç/kapat |
+| **Kopyalayınca oku** | Seç → Ctrl+C → otomatik oku (yapıştırmadan) |
+| **Kısayol** | Seçili/pano metnini okuma kısayolu (varsayılan `Ctrl+Alt+S`) |
 | **Proje süzgeci** | Yalnız belirli bir proje klasörünü izle (boş = tüm aktif oturumlar) |
 
 > **Susturmak için:** surattaki 🔊 düğmesine bas, ya da sistem tepsisindeki (tray) Okur

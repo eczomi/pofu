@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, screen } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, screen, clipboard, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -25,6 +25,8 @@ const DEFAULT_CONFIG = {
   cueFlash: true,                          // titreme + yazili bildirim
   muted: false,                            // ana sustur: acikken hicbir sey okumaz/titremez
   projectFilter: '',                       // yalniz bu proje klasorunu izle ('' = hepsi)
+  hotkey: 'CommandOrControl+Alt+S',        // secili/pano metni okuma kisayolu
+  readOnCopy: false,                       // sec + kopyala (Ctrl+C) -> otomatik oku
   x: null, y: null,                        // pencere konumu (hafiza)
 };
 
@@ -33,6 +35,9 @@ let tray = null;
 let watcher = null;
 let config = { ...DEFAULT_CONFIG };
 let lastLang = 'en';
+let hotkeyOk = false;
+let lastClip = '';
+let clipTimer = null;
 
 function configPath() {
   // Test/tanilama icin OKUR_CONFIG ile ozel dosya gosterilebilir.
@@ -227,9 +232,55 @@ function startWatcher() {
   watcher.start();
 }
 
+// Kullanicinin secip istedigi metni HEMEN okur (otomatik okuma/sustur'u yok sayar).
+// Kaynak: global kisayol -> pano, ya da surattaki yapistir-oku kutusu.
+function manualRead(rawText) {
+  const text = (rawText || '').trim();
+  if (!text) return;
+  const sentences = toSentences(text, { skipCode: config.skipCode });
+  if (!sentences.length) return;
+  let lang = config.language;
+  if (!lang || lang === 'auto') { lang = detect(text, lastLang); lastLang = lang; }
+  dlog('manuel oku:', sentences.length, 'cumle, lang=' + lang);
+  if (win && !win.isDestroyed()) {
+    if (!win.isVisible()) win.show();
+    win.webContents.send('read', { sentences, lang, label: 'Seçili metin', isQuestion: false, manual: true });
+  }
+}
+
+function registerHotkey() {
+  try { globalShortcut.unregisterAll(); } catch { /* */ }
+  const acc = (config.hotkey || '').trim();
+  hotkeyOk = false;
+  if (acc) {
+    try { hotkeyOk = globalShortcut.register(acc, () => manualRead(clipboard.readText())); }
+    catch { hotkeyOk = false; }
+  }
+  dlog('kisayol', acc, hotkeyOk ? 'kayitli' : 'KAYIT EDILEMEDI (baska uygulama kullaniyor olabilir)');
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('command', { action: 'hotkey', ok: hotkeyOk, hotkey: acc });
+  }
+  return hotkeyOk;
+}
+
+// Pano izleyici: "Kopyalayınca oku" acikken, yeni kopyalanan metni okur.
+function startClipboardWatch() {
+  try { lastClip = clipboard.readText() || ''; } catch { lastClip = ''; }
+  if (clipTimer) clearInterval(clipTimer);
+  clipTimer = setInterval(() => {
+    let t = '';
+    try { t = clipboard.readText() || ''; } catch { return; }
+    if (t && t !== lastClip) {
+      lastClip = t;
+      if (config.readOnCopy && !config.muted) manualRead(t);
+    }
+  }, 500);
+}
+
 // ---- IPC ----
 ipcMain.on('renderer-ready', (e) => {
   e.sender.send('config', config);
+  e.sender.send('command', { action: 'hotkey', ok: hotkeyOk, hotkey: config.hotkey });
   startWatcher();
 });
 
@@ -239,11 +290,17 @@ ipcMain.on('save-config', (_e, partial) => {
   const filterChanged = partial && 'projectFilter' in partial &&
     partial.projectFilter !== config.projectFilter;
   const mutedChanged = partial && 'muted' in partial && partial.muted !== config.muted;
+  const hotkeyChanged = partial && 'hotkey' in partial && partial.hotkey !== config.hotkey;
   config = { ...config, ...partial };
   saveConfig();
   if (mutedChanged) { if (config.muted) clearBuffers(); rebuildTrayMenu(); }
   if (filterChanged) startWatcher();
+  if (hotkeyChanged) registerHotkey();
 });
+
+// Manuel okuma: surattaki kutudan gelen metin ya da pano.
+ipcMain.on('read-text', (_e, payload) => manualRead(payload && payload.text));
+ipcMain.on('read-clipboard', () => manualRead(clipboard.readText()));
 
 ipcMain.on('quit', () => { app.isQuiting = true; app.quit(); });
 
@@ -260,7 +317,11 @@ if (!gotLock) {
     config = loadConfig();
     createWindow();
     createTray();
+    registerHotkey();
+    startClipboardWatch();
   });
+
+  app.on('will-quit', () => { try { globalShortcut.unregisterAll(); } catch { /* */ } });
 
   // Pencere gizlense de tepside calismaya devam etsin.
   app.on('window-all-closed', () => { /* cikma; tepsiden yonetiliyor */ });

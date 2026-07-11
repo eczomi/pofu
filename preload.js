@@ -10,5 +10,7 @@ contextBridge.exposeInMainWorld('okur', {
   ready: () => ipcRenderer.send('renderer-ready'),
   setState: (s) => ipcRenderer.send('state', s),
   saveConfig: (c) => ipcRenderer.send('save-config', c),
+  readText: (text) => ipcRenderer.send('read-text', { text }),
+  readClipboard: () => ipcRenderer.send('read-clipboard'),
   quit: () => ipcRenderer.send('quit'),
 });

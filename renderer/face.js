@@ -14,6 +14,8 @@ let cfg = {
   cueFlash: true,
   muted: false,
   projectFilter: '',
+  hotkey: 'CommandOrControl+Alt+S',
+  readOnCopy: false,
 };
 
 let sentences = [];      // { text, lang, el }
@@ -24,6 +26,7 @@ let chatterboxOk = false;
 let voices = [];
 let stopped = false;
 let cueTimer = null;
+let gen = 0; // konusma nesli — eski onend'lerin yanlislikla ilerletmesini onler
 const audio = new Audio();
 
 // Algilanan dile gore bildirim kelimesi
@@ -131,11 +134,34 @@ function playFrom(i) {
   idx = i;
   if (idx >= sentences.length) { setState('idle'); setFace(false); return; }
   highlight(idx);
+  const myGen = ++gen;
   const s = sentences[idx];
   speak(s.text, s.lang, () => {
-    if (stopped || state !== 'playing') return;
+    if (myGen !== gen || stopped || state !== 'playing') return;
     playFrom(idx + 1);
   });
+}
+
+// Su anki konusmayi durdurur (durumu sifirlamadan) — atlama/manuel okuma icin.
+function cancelCurrent() {
+  gen++; // bekleyen onend'leri gecersiz kil
+  if (engine === 'browser') { try { speechSynthesis.cancel(); } catch { /* */ } }
+  else { try { audio.pause(); audio.currentTime = 0; } catch { /* */ } }
+}
+
+// Belirli bir cumleye atla ve oradan oku (tiklayinca) — uzerinde lighter yanar.
+function jumpTo(i) {
+  if (i < 0 || i >= sentences.length) return;
+  cancelCurrent();
+  stopped = false;
+  setState('playing');
+  setFace(true);
+  playFrom(i);
+}
+
+function indexOfEl(el) {
+  for (let j = 0; j < sentences.length; j++) if (sentences[j].el === el) return j;
+  return -1;
 }
 
 function startNext() {
@@ -165,6 +191,7 @@ function resume() {
 
 function stopAll() {
   stopped = true;
+  gen++; // bekleyen onend'leri gecersiz kil
   setState('idle');
   setFace(false);
   if (engine === 'browser') { try { speechSynthesis.cancel(); } catch { /* */ } }
@@ -179,15 +206,27 @@ function toggle() {
 }
 
 // ---- Altyazi / lighter ----
-function addSentences(list, lang) {
+// Her cevap bir "blok"tur; blok basinda hangi oturumdan geldigi yazar.
+function addSentences(list, lang, label) {
   const linesEl = $('#lines');
+  const block = document.createElement('div');
+  block.className = 'block';
+  if (label) {
+    const h = document.createElement('div');
+    h.className = 'block-label';
+    h.textContent = label;
+    block.appendChild(h);
+  }
   for (const text of list) {
     const el = document.createElement('div');
     el.className = 'line';
     el.textContent = text;
-    linesEl.appendChild(el);
-    sentences.push({ text, lang, el });
+    el.title = 'Buradan oku';
+    el.addEventListener('click', () => jumpTo(indexOfEl(el)));
+    block.appendChild(el);
+    sentences.push({ text, lang, label: label || '', el });
   }
+  linesEl.appendChild(block);
   $('#caption').classList.remove('hidden');
   trimCaption();
 }
@@ -197,7 +236,14 @@ function trimCaption() {
   const MAX = 120;
   while (sentences.length > MAX && idx > 10) {
     const s = sentences.shift();
-    if (s.el && s.el.parentNode) s.el.parentNode.removeChild(s.el);
+    const el = s.el;
+    const block = el && el.parentNode;
+    if (el && block) {
+      block.removeChild(el);
+      if (block.querySelectorAll('.line').length === 0 && block.parentNode) {
+        block.parentNode.removeChild(block);
+      }
+    }
     idx--;
   }
 }
@@ -209,7 +255,11 @@ function highlight(i) {
     el.classList.toggle('read', j < i);
   }
   const cur = sentences[i];
-  if (cur && cur.el) cur.el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  if (cur) {
+    if (cur.el) cur.el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const nr = $('#nowReading');
+    if (nr) nr.textContent = cur.label || '';
+  }
 }
 
 // ---- Surat durumu + ipuclari ----
@@ -222,7 +272,8 @@ function setFace(speaking) {
 }
 
 function updateToggleBtn() {
-  $('#btnToggle').textContent = state === 'playing' ? '⏸' : '▶';
+  const b = $('#btnToggle');
+  if (b) b.classList.toggle('playing', state === 'playing');
 }
 
 function isQuestionMessage(list) {
@@ -239,7 +290,7 @@ function playCue(isQuestion, lang, label) {
   const face = $('#face');
   const badge = $('#cueBadge');
   // Yazili bildirim: hangi oturum + tip (✓ bitti / ❓ soru)
-  const text = (isQuestion ? '❓ ' : '✓ ') + (label || (CUE_WORDS[kind][lang] || CUE_WORDS[kind].en));
+  const text = label || (CUE_WORDS[kind][lang] || CUE_WORDS[kind].en);
 
   // Gorsel ipucu (titreme + yazili bildirim)
   if (cfg.cueFlash) {
@@ -271,14 +322,12 @@ function playCue(isQuestion, lang, label) {
 // ---- Ana sustur ----
 function applyMuted(m) {
   cfg.muted = !!m;
-  const btn = $('#btnMute');
-  if (btn) btn.textContent = m ? '🔇' : '🔊';
   $('#app').classList.toggle('muted', m);
   if (m) {
     stopAll();
     const badge = $('#cueBadge');
     if (badge) {
-      badge.textContent = '🔇 Sessiz';
+      badge.textContent = 'Sessiz';
       badge.classList.remove('q');
       badge.classList.add('show');
       clearTimeout(cueTimer);
@@ -293,14 +342,23 @@ function toggleMute() {
   window.okur.saveConfig({ muted: m });
 }
 
-// ---- Yeni cevap geldi (yanit tamamlandiginda, tek sefer) ----
-function onRead({ sentences: list, lang, label, isQuestion }) {
-  if (cfg.muted) return;
+// ---- Yeni cevap / manuel okuma geldi ----
+function onRead({ sentences: list, lang, label, isQuestion, manual }) {
+  if (!manual && cfg.muted) return;
   if (!list || !list.length) return;
   const language = lang || 'en';
+
+  // Manuel (secili/pano metni): hemen oku — mute/autoRead'i yok say.
+  if (manual) {
+    const startIdx = sentences.length;
+    addSentences(list, language, label || 'Seçili metin');
+    jumpTo(startIdx);
+    return;
+  }
+
   playCue(!!isQuestion, language, label || '');
   const wasIdle = (state === 'idle');
-  addSentences(list, language);
+  addSentences(list, language, label || '');
   if (cfg.autoRead && wasIdle) {
     setTimeout(() => { if (state === 'idle' && !cfg.muted) startNext(); }, cfg.cueSound ? 650 : 150);
   }
@@ -344,6 +402,22 @@ function populateVoiceSelect() {
   sel.value = prev || '';
 }
 
+function prettyHotkey(acc) {
+  return String(acc || '')
+    .replace(/CommandOrControl|CmdOrCtrl/gi, 'Ctrl')
+    .replace(/Command|Cmd/gi, 'Cmd')
+    .replace(/Control/gi, 'Ctrl');
+}
+
+function setHotkeyHint(hk, ok) {
+  const hint = $('#hotkeyHint');
+  if (!hint) return;
+  const pk = prettyHotkey(hk);
+  hint.textContent = ok === false
+    ? '⚠ ' + pk + ' kayıt edilemedi (başka uygulamada). Ayarlardan değiştir.'
+    : 'Seç → kopyala (Ctrl+C) → oku. Ya da kısayol: ' + pk;
+}
+
 function applyConfigToUI() {
   $('#setEngine').value = cfg.engine;
   $('#setScope').value = cfg.readScope || 'lastParagraph';
@@ -356,6 +430,9 @@ function applyConfigToUI() {
   $('#setCueSound').checked = !!cfg.cueSound;
   $('#setCueFlash').checked = !!cfg.cueFlash;
   $('#setFilter').value = cfg.projectFilter || '';
+  $('#setHotkey').value = cfg.hotkey || '';
+  $('#setReadOnCopy').checked = !!cfg.readOnCopy;
+  setHotkeyHint(cfg.hotkey, undefined);
   applyMuted(!!cfg.muted);
 }
 
@@ -379,6 +456,17 @@ function bindUI() {
   $('#btnSettings').addEventListener('click', () => {
     $('#settings').classList.toggle('hidden');
   });
+  $('#btnSpeak').addEventListener('click', (e) => {
+    e.stopPropagation();
+    $('#speakBox').classList.toggle('hidden');
+    const t = $('#speakText');
+    if (!$('#speakBox').classList.contains('hidden') && t) t.focus();
+  });
+  $('#btnReadText').addEventListener('click', () => {
+    const t = $('#speakText');
+    if (t && t.value.trim()) { window.okur.readText(t.value); }
+  });
+  $('#btnReadClip').addEventListener('click', () => window.okur.readClipboard());
   $('#btnQuit').addEventListener('click', () => window.okur.quit());
 
   $('#setEngine').addEventListener('change', (e) => { save({ engine: e.target.value }); detectEngine(); });
@@ -395,6 +483,11 @@ function bindUI() {
   $('#setCueSound').addEventListener('change', (e) => save({ cueSound: e.target.checked }));
   $('#setCueFlash').addEventListener('change', (e) => save({ cueFlash: e.target.checked }));
   $('#setFilter').addEventListener('change', (e) => save({ projectFilter: e.target.value.trim() }));
+  $('#setReadOnCopy').addEventListener('change', (e) => save({ readOnCopy: e.target.checked }));
+  $('#setHotkey').addEventListener('change', (e) => {
+    save({ hotkey: e.target.value.trim() });
+    setHotkeyHint(e.target.value.trim(), undefined);
+  });
 }
 
 // ---- Baslat ----
@@ -406,11 +499,13 @@ window.okur.onConfig((c) => {
   updateStatus();
 });
 window.okur.onRead(onRead);
-window.okur.onCommand(({ action }) => {
+window.okur.onCommand((msg) => {
+  const action = msg && msg.action;
   if (action === 'toggle') toggle();
   else if (action === 'stop') stopAll();
   else if (action === 'muted-on') applyMuted(true);
   else if (action === 'muted-off') applyMuted(false);
+  else if (action === 'hotkey') setHotkeyHint(msg.hotkey, msg.ok);
 });
 
 window.addEventListener('DOMContentLoaded', () => {
