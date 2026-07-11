@@ -10,11 +10,11 @@ let cfg = {
   skipCode: true,
   autoRead: false,
   readScope: 'lastParagraph',
-  cueSound: false,
   cueFlash: true,
   muted: false,
   projectFilter: '',
   hotkey: 'CommandOrControl+Alt+S',
+  readOnCopy: true,
 };
 
 let sentences = [];      // { text, lang, el }
@@ -68,12 +68,15 @@ function pickVoice(langCode) {
 }
 
 // ---- Motor tespiti ----
+let serverVoices = []; // ses sunucusunun dogal sesleri (edge)
+let detectTries = 0;
+
 async function detectEngine() {
   chatterboxOk = false;
   if (cfg.engine !== 'browser') {
     try {
       const c = new AbortController();
-      const t = setTimeout(() => c.abort(), 800);
+      const t = setTimeout(() => c.abort(), 900);
       const url = cfg.chatterboxUrl.replace(/\/$/, '') + '/health';
       const r = await fetch(url, { signal: c.signal });
       clearTimeout(t);
@@ -84,6 +87,30 @@ async function detectEngine() {
   else if (cfg.engine === 'browser') engine = 'browser';
   else engine = chatterboxOk ? 'chatterbox' : 'browser';
   updateStatus();
+
+  if (chatterboxOk && !serverVoices.length) loadServerVoices();
+
+  // Sunucu Okur'la birlikte aciliyor; ilk denemede hazir olmayabilir — tekrar dene.
+  if (!chatterboxOk && cfg.engine !== 'browser' && detectTries < 4) {
+    detectTries++;
+    setTimeout(detectEngine, 2500);
+  }
+}
+
+async function loadServerVoices() {
+  try {
+    const url = cfg.chatterboxUrl.replace(/\/$/, '') + '/voices';
+    const r = await fetch(url);
+    if (!r.ok) return;
+    const all = await r.json();
+    const known = new Set(LANGS.map((l) => l[0]));
+    serverVoices = (all || []).filter((v) => known.has(String(v.lang || '').slice(0, 2)));
+    populateVoiceSelect();
+  } catch { /* sunucu yok */ }
+}
+
+function isServerVoice(name) {
+  return !!name && serverVoices.some((v) => v.name === name);
 }
 
 // ---- Konusma ----
@@ -110,7 +137,11 @@ async function speakChatterbox(text, lang, onend) {
     const r = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, language: (lang || 'en').slice(0, 2) }),
+      body: JSON.stringify({
+        text,
+        language: (lang || 'en').slice(0, 2),
+        voice: isServerVoice(cfg.voiceName) ? cfg.voiceName : '',
+      }),
     });
     if (!r.ok) throw new Error('tts ' + r.status);
     const blob = await r.blob();
@@ -290,7 +321,7 @@ function playCue(isQuestion, lang, label) {
   // Yazili bildirim: hangi oturum + tip (✓ bitti / ❓ soru)
   const text = label || (CUE_WORDS[kind][lang] || CUE_WORDS[kind].en);
 
-  // Gorsel ipucu (titreme + yazili bildirim)
+  // Yalniz gorsel ipucu (titreme + yazili rozet) — sesli bildirim yok
   if (cfg.cueFlash) {
     face.classList.remove('shake', 'blink');
     void face.offsetWidth; // animasyonu yeniden tetikle
@@ -303,17 +334,6 @@ function playCue(isQuestion, lang, label) {
       badge.classList.remove('show');
       face.classList.remove('shake', 'blink');
     }, 3500);
-  }
-
-  // Sesli "Bitti/Soru" — yalniz acikca istenirse ve bosta iken
-  if (cfg.cueSound && !cfg.muted && state !== 'playing') {
-    try { speechSynthesis.cancel(); } catch { /* */ }
-    const u = new SpeechSynthesisUtterance(CUE_WORDS[kind][lang] || CUE_WORDS[kind].en);
-    const v = pickVoice(lang);
-    u.lang = v ? v.lang : (lang || 'en');
-    if (v) u.voice = v;
-    u.rate = 1.05;
-    speechSynthesis.speak(u);
   }
 }
 
@@ -372,7 +392,7 @@ function onRead(msg) {
   if (msg.id) lastMsgs.set(msg.id, { sentences: list, lang: language, label, title: msg.title || '' });
   playCue(msg.kind === 'approval', language, label);
   if (cfg.autoRead && !cfg.muted && state === 'idle') {
-    setTimeout(() => { if (state === 'idle') readNow(list, language, label, msg.title || ''); }, cfg.cueSound ? 650 : 150);
+    setTimeout(() => { if (state === 'idle') readNow(list, language, label, msg.title || ''); }, 150);
   }
 }
 
@@ -485,14 +505,35 @@ function populateVoiceSelect() {
   const prev = cfg.voiceName;
   sel.innerHTML = '';
   const auto = document.createElement('option');
-  auto.value = ''; auto.textContent = 'Otomatik (dile gore)';
+  auto.value = ''; auto.textContent = 'Otomatik (dile göre)';
   sel.appendChild(auto);
-  for (const v of voices) {
-    const o = document.createElement('option');
-    o.value = v.name; o.textContent = `${v.name} (${v.lang})`;
-    sel.appendChild(o);
+
+  // Dogal sunucu sesleri (varsa) — en ustte, cunku cok daha akici
+  if (serverVoices.length) {
+    const grp = document.createElement('optgroup');
+    grp.label = 'Doğal sesler (sunucu)';
+    for (const v of serverVoices) {
+      const o = document.createElement('option');
+      o.value = v.name;
+      o.textContent = `${v.name.replace(/Neural$/, '')} (${v.lang}${v.gender ? ', ' + (v.gender === 'Female' ? 'kadın' : 'erkek') : ''})`;
+      grp.appendChild(o);
+    }
+    sel.appendChild(grp);
+  }
+
+  // Tarayici / Windows sesleri
+  if (voices.length) {
+    const grp2 = document.createElement('optgroup');
+    grp2.label = 'Windows sesleri';
+    for (const v of voices) {
+      const o = document.createElement('option');
+      o.value = v.name; o.textContent = `${v.name} (${v.lang})`;
+      grp2.appendChild(o);
+    }
+    sel.appendChild(grp2);
   }
   sel.value = prev || '';
+  if (sel.value !== (prev || '')) sel.value = '';
 }
 
 function prettyHotkey(acc) {
@@ -520,11 +561,10 @@ function applyConfigToUI() {
   $('#rateVal').textContent = (Number(cfg.rate).toFixed(2)) + 'x';
   $('#setAutoRead').checked = !!cfg.autoRead;
   $('#setSkipCode').checked = !!cfg.skipCode;
-  $('#setCueSound').checked = !!cfg.cueSound;
   $('#setCueFlash').checked = !!cfg.cueFlash;
   $('#setFilter').value = cfg.projectFilter || '';
   $('#setHotkey').value = cfg.hotkey || '';
-  $('#setStartWin').checked = !!cfg.startWithWindows;
+  $('#setReadOnCopy').checked = !!cfg.readOnCopy;
   setHotkeyHint(cfg.hotkey, undefined);
   applyMuted(!!cfg.muted);
 }
@@ -576,14 +616,13 @@ function bindUI() {
   $('#setScope').addEventListener('change', (e) => save({ readScope: e.target.value }));
   $('#setAutoRead').addEventListener('change', (e) => save({ autoRead: e.target.checked }));
   $('#setSkipCode').addEventListener('change', (e) => save({ skipCode: e.target.checked }));
-  $('#setCueSound').addEventListener('change', (e) => save({ cueSound: e.target.checked }));
   $('#setCueFlash').addEventListener('change', (e) => save({ cueFlash: e.target.checked }));
   $('#setFilter').addEventListener('change', (e) => save({ projectFilter: e.target.value.trim() }));
   $('#setHotkey').addEventListener('change', (e) => {
     save({ hotkey: e.target.value.trim() });
     setHotkeyHint(e.target.value.trim(), undefined);
   });
-  $('#setStartWin').addEventListener('change', (e) => save({ startWithWindows: e.target.checked }));
+  $('#setReadOnCopy').addEventListener('change', (e) => save({ readOnCopy: e.target.checked }));
 }
 
 // ---- Baslat ----

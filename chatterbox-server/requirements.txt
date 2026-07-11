@@ -1,9 +1,7 @@
-# Okur — Chatterbox TTS sunucusu bagimliliklari
-# GPU'nuz varsa PyTorch'un CUDA surumunu https://pytorch.org talimatiyla kurun.
-# CPU da calisir (yavas). Model agirliklari ilk calistirmada indirilir (~birkac GB).
-chatterbox-tts
-soundfile
-# torch ve torchaudio genellikle chatterbox-tts ile birlikte gelir;
-# gelmezse asagidakileri acin:
-# torch
-# torchaudio
+# Okur ses sunucusu
+# Onerilen (dogal, akici, saniyede kurulur — internet gerektirir):
+edge-tts
+
+# Tamamen cevrimdisi yerel model istersen (agir: GB'larca indirme, GPU'suz yavas):
+# chatterbox-tts
+# soundfile

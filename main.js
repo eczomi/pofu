@@ -22,14 +22,13 @@ const DEFAULT_CONFIG = {
   autoRead: false,                         // metin-oncelikli: varsayilan otomatik SESLI okuma KAPALI
   readScope: 'lastParagraph',              // 'all' | 'lastParagraph' | 'lastSentence' — ne okunsun
   settleMs: 2500,                          // yanit "bitti" sayilmadan once beklenen sessizlik (ms)
-  cueSound: false,                         // sesli "Bitti/Soru" bildirimi (varsayilan kapali)
-  cueFlash: true,                          // titreme + yazili bildirim
+  cueFlash: true,                          // bitince titreme + yazili rozet
   muted: false,                            // ana sustur: acikken hicbir sey okumaz/titremez
   projectFilter: '',                       // yalniz bu proje klasorunu izle ('' = hepsi)
   hotkey: 'CommandOrControl+Alt+S',        // secili/pano metni okuma kisayolu
   httpPort: 7889,                          // taray ici uzanti buraya metin yollar (sag tik -> Oku)
-  startWithWindows: false,                 // Windows acilisinda otomatik baslat
-  cfgVersion: 2,                           // ayar goc surumu
+  readOnCopy: true,                        // sec + kopyala (Ctrl+C) -> otomatik oku
+  cfgVersion: 3,                           // ayar goc surumu
   x: null, y: null,                        // pencere konumu (hafiza)
 };
 
@@ -54,11 +53,17 @@ function loadConfig() {
     c = { ...DEFAULT_CONFIG };
   }
   // Goc v2: metin-oncelikli surume gecis — eski kayitli autoRead=true'yu bir
-  // kereligine kapat (Sevgi/kullanici sonra ayardan bilincli acabilir).
+  // kereligine kapat (kullanici sonra ayardan bilincli acabilir).
   if (!c.cfgVersion || c.cfgVersion < 2) {
     c.autoRead = false;
-    c.cfgVersion = 2;
   }
+  // Goc v3: "kopyalayinca oku" geri geldi (istek uzerine) — bir kereligine ac.
+  if (!c.cfgVersion || c.cfgVersion < 3) {
+    c.readOnCopy = true;
+    c.cfgVersion = 3;
+  }
+  delete c.startWithWindows; // kaldirilan ozellik
+  delete c.cueSound;         // kaldirilan ozellik (sesli Bitti/Soru)
   return c;
 }
 
@@ -154,17 +159,47 @@ function applyResize(h) {
   win.setContentSize(w, h);
 }
 
-// Windows ile baslat (login item)
-function applyLoginItem() {
+// "Windows ile baslat" ozelligi kaldirildi — eski kayit varsa temizle.
+function cleanupLoginItem() {
   try {
-    const settings = { openAtLogin: !!config.startWithWindows };
-    if (!app.isPackaged) {
-      settings.path = process.execPath;                 // electron.exe
-      settings.args = [path.resolve(__dirname)];        // proje klasoru
-    }
-    app.setLoginItemSettings(settings);
-    dlog('login item:', settings.openAtLogin);
+    app.setLoginItemSettings({
+      openAtLogin: false,
+      path: process.execPath,
+      args: [path.resolve(__dirname)],
+    });
   } catch { /* yoksay */ }
+}
+
+// Yerel ses (TTS) sunucusunu otomatik baslat — chatterbox-server/.venv kuruluysa.
+// Kurulu degilse sessizce atlanir; tarayici sesi calismaya devam eder.
+let ttsProc = null;
+function startTtsServer() {
+  const py = path.join(__dirname, 'chatterbox-server', '.venv', 'Scripts', 'python.exe');
+  const script = path.join(__dirname, 'chatterbox-server', 'server.py');
+  if (!fs.existsSync(py) || !fs.existsSync(script)) { dlog('ses sunucusu: venv yok, atlandi'); return; }
+  try {
+    const { spawn } = require('child_process');
+    ttsProc = spawn(py, [script], { cwd: path.dirname(script), windowsHide: true, stdio: 'ignore' });
+    ttsProc.on('exit', (code) => { dlog('ses sunucusu kapandi:', code); ttsProc = null; });
+    ttsProc.on('error', (e) => { dlog('ses sunucusu hatasi:', e.message); ttsProc = null; });
+    dlog('ses sunucusu baslatildi (pid ' + ttsProc.pid + ')');
+  } catch (e) { dlog('ses sunucusu baslatilamadi:', e.message); }
+}
+
+// Pano izleyici: "Kopyalayinca oku" acikken yeni kopyalanan metni okur.
+let lastClip = '';
+let clipTimer = null;
+function startClipboardWatch() {
+  try { lastClip = clipboard.readText() || ''; } catch { lastClip = ''; }
+  if (clipTimer) clearInterval(clipTimer);
+  clipTimer = setInterval(() => {
+    let t = '';
+    try { t = clipboard.readText() || ''; } catch { return; }
+    if (t && t !== lastClip) {
+      lastClip = t;
+      if (config.readOnCopy && !config.muted) manualRead(t);
+    }
+  }, 500);
 }
 
 function createTray() {
@@ -473,14 +508,11 @@ ipcMain.on('save-config', (_e, partial) => {
     partial.projectFilter !== config.projectFilter;
   const mutedChanged = partial && 'muted' in partial && partial.muted !== config.muted;
   const hotkeyChanged = partial && 'hotkey' in partial && partial.hotkey !== config.hotkey;
-  const loginChanged = partial && 'startWithWindows' in partial &&
-    partial.startWithWindows !== config.startWithWindows;
   config = { ...config, ...partial };
   saveConfig();
   if (mutedChanged) rebuildTrayMenu();
   if (filterChanged) startWatcher();
   if (hotkeyChanged) registerHotkey();
-  if (loginChanged) applyLoginItem();
 });
 
 // Manuel okuma: surattaki kutudan gelen metin ya da pano.
@@ -504,11 +536,15 @@ if (!gotLock) {
     createTray();
     registerHotkey();
     startApiServer();
+    startClipboardWatch();
+    startTtsServer();
+    cleanupLoginItem();
   });
 
   app.on('will-quit', () => {
     try { globalShortcut.unregisterAll(); } catch { /* */ }
     try { if (apiServer) apiServer.close(); } catch { /* */ }
+    try { if (ttsProc) ttsProc.kill(); } catch { /* */ }
   });
 
   // Pencere gizlense de tepside calismaya devam etsin.
