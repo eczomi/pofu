@@ -90,7 +90,7 @@ async function detectEngine() {
 
   if (chatterboxOk && !serverVoices.length) loadServerVoices();
 
-  // Sunucu Okur'la birlikte aciliyor; ilk denemede hazir olmayabilir — tekrar dene.
+  // Sunucu Pofu'yla birlikte aciliyor; ilk denemede hazir olmayabilir — tekrar dene.
   if (!chatterboxOk && cfg.engine !== 'browser' && detectTries < 4) {
     detectTries++;
     setTimeout(detectEngine, 2500);
@@ -314,18 +314,44 @@ function isQuestionMessage(list) {
   return false;
 }
 
-function playCue(isQuestion, lang, label) {
+// Mini mod konusma balonu — pencereyi gecici genisletir, sonra geri kuculur.
+let bubbleShowing = false;
+let bubbleTimer = null;
+function showBubble(label, isQuestion, title) {
+  const b = $('#bubble');
+  if (!b) return;
+  $('#bubbleHead').textContent = label + ' · ' + (isQuestion ? 'soru' : 'bitti');
+  $('#bubbleText').textContent = title || '';
+  b.classList.remove('hidden');
+  bubbleShowing = true;
+  requestResize();
+  clearTimeout(bubbleTimer);
+  bubbleTimer = setTimeout(() => {
+    b.classList.add('hidden');
+    bubbleShowing = false;
+    requestResize();
+  }, 5000);
+}
+
+function playCue(isQuestion, lang, label, title) {
   const kind = isQuestion ? 'question' : 'done';
   const face = $('#face');
   const badge = $('#cueBadge');
-  // Yazili bildirim: hangi oturum + tip (✓ bitti / ❓ soru)
   const text = label || (CUE_WORDS[kind][lang] || CUE_WORDS[kind].en);
 
-  // Yalniz gorsel ipucu (titreme + yazili rozet) — sesli bildirim yok
-  if (cfg.cueFlash) {
-    face.classList.remove('shake', 'blink');
-    void face.offsetWidth; // animasyonu yeniden tetikle
-    face.classList.add(isQuestion ? 'blink' : 'shake');
+  if (!cfg.cueFlash) return;
+
+  // Titreme / yanip sonme (her iki modda)
+  face.classList.remove('shake', 'blink');
+  void face.offsetWidth; // animasyonu yeniden tetikle
+  face.classList.add(isQuestion ? 'blink' : 'shake');
+
+  if (cfg.miniMode) {
+    // Mini mod: minik konusma balonu ("para-app · bitti" + kisa baslik)
+    showBubble(label || 'Claude', isQuestion, title || '');
+    clearTimeout(cueTimer);
+    cueTimer = setTimeout(() => face.classList.remove('shake', 'blink'), 3500);
+  } else {
     badge.textContent = text;
     badge.classList.toggle('q', isQuestion);
     badge.classList.add('show');
@@ -390,7 +416,7 @@ function onRead(msg) {
   // Otomatik yanıt: oturum satırı ana bildirimdir (sessions event'i günceller).
   // Burada: son mesajı sakla + kısa görsel ipucu + isteğe bağlı sesli okuma.
   if (msg.id) lastMsgs.set(msg.id, { sentences: list, lang: language, label, title: msg.title || '' });
-  playCue(msg.kind === 'approval', language, label);
+  playCue(msg.kind === 'approval', language, label, msg.title || '');
   if (cfg.autoRead && !cfg.muted && state === 'idle') {
     setTimeout(() => { if (state === 'idle') readNow(list, language, label, msg.title || ''); }, 150);
   }
@@ -704,7 +730,10 @@ window.okur.onCommand((msg) => {
 // Debounce'lu: kucuk oynamalarda surekli resize atma (surukleme rahat kalsin).
 let lastH = 0;
 let lastW = 0;
-function contentWidth() { return cfg.miniMode ? 84 : 296; }
+function contentWidth() {
+  if (cfg.miniMode) return bubbleShowing ? 248 : 68;
+  return 248;
+}
 let resizeTimer = null;
 function requestResize() {
   clearTimeout(resizeTimer);

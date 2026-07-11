@@ -1,135 +1,108 @@
 <div align="center">
-  <img src="assets/face.png" width="160" alt="Okur" style="border-radius:50%" />
+  <img src="assets/face.png" width="130" alt="Pofu" />
 
-  <h1>Okur</h1>
-  <p><b>Claude'un cevaplarını sesli okuyan, ekranda her şeyin üstünde yüzen minik bir surat.</b><br/>
-  <i>A tiny floating face that reads Claude's answers out loud — on top of every window.</i></p>
+  <h1>Pofu</h1>
+  <p><b>Claude Code yoldaşın: ekranda yüzen minik maskot.</b><br/>
+  Hangi sekme çalışıyor, hangisi onay bekliyor, hangisi bitti — tek bakışta.
+  İstersen seçtiğin her metni doğal bir sesle okur.</p>
+
+  <p>
+    <a href="https://github.com/sevgiikilic/pofu/releases/latest"><b>⬇️ İndir (Windows) — Pofu-Setup.exe</b></a>
+  </p>
 </div>
 
 ---
 
-## 🇹🇷 Türkçe
+## 🇹🇷 Ne yapar?
 
-Bilgisayarında gezerken (Chrome, e-posta, ne olursa) Claude Code'a bir şey sorarsın;
-Okur cevabı **sesli okur**. Ekranın köşesinde küçük, yuvarlak, sevimli bir surat durur —
-her uygulamanın üstünde. Sen başka bir işle uğraşırken Claude'un yazdığını dinlersin.
+Aynı anda 5 projede 10 Claude sekmesiyle mi çalışıyorsun? Pofu köşede durur,
+sen başka işlere bakarken sekmelerini izler:
 
-### Ne yapar?
-
-- 🔔 **Oturum barı (asıl özellik)** — birden çok Claude penceresi/sekmesinde çalışırken
-  ekrana dönmeden göz at: her oturum canlı bir satır. **Çalışıyor** = akan ışık çubuğu,
-  **onay bekliyor** = parlak nabız, **bitti** = parlak + son mesajın başlığı. Saatle birlikte.
-- 🖱️ **Satıra tıkla → o pencereye git** — biten/onay bekleyen oturuma tıklarsan o VS Code
-  penceresi öne gelir. Satırdaki hoparlörle son mesajı sesli dinlersin.
-- ✋ **Her yerinden tut, taşı** — pencereyi arka planından tutup istediğin köşeye sürükle.
-- ✋ **Seçtiğin metni okut (sağ tık)** — herhangi bir web sayfası/kitap/PDF'te metni seç,
-  **sağ tık → "Oku"** (Chrome/Edge uzantısı) → minik ajan okur, **ne okuduğunu** üstünde
-  kısaca yazar. Kısayol da var (`Ctrl+Alt+S`). Yapıştırma yok.
-- 🔥 **"Lighter" ile son kaldığın yeri aydınlatır** — okunan cümle bir alevle işaretlenir.
-- 👆 **Tıkla → dur / devam.** Bildirimlerden birine tıklarsan onu sesli dinlersin.
-- 🪄 **Ekranın üstünde yüzer** — neredeysen görünür (her zaman en üstte).
-- 🔇 **Sustur = yalnız ses susar**, metin bildirimleri gelmeye devam eder.
-- 🗣️ **İsteğe bağlı otomatik sesli okuma** — istersen aç (Ayarlar → Gelince otomatik SESLİ oku);
-  varsayılan kapalı (metin öncelikli). Yanıt **tamamlanınca** bir kez okur, son özetini.
-- 🌍 **Çok dilli** — mesajın dilini otomatik algılar, doğru sesi seçer.
-- 🔒 **Gizli** — metin bilgisayarından çıkmaz. Tarayıcı sesi tamamen çevrimdışıdır.
+- 🔔 **Oturum barı** — her Claude oturumu canlı bir satır:
+  **çalışıyor** = akan ışık çubuğu · **onay bekliyor** = parlak nabız · **bitti** = parlak ✓ + son mesajın özeti
+- 🖱️ **Satıra tıkla → o pencereye git** — VS Code'daki o pencere öne gelir
+- ✋ **Seçtiğin metni okut** (web sayfası, kitap, PDF; yapıştırmadan):
+  - **Sağ tık → "Oku (Pofu ile)"** — Chrome/Edge uzantısıyla (`browser-extension/`)
+  - **Seç → Ctrl+C** — "Kopyalayınca oku" açıkken her uygulamada
+  - **Kısayol** `Ctrl+Alt+S` — panodaki metni okur
+  - Ne okuduğu üstünde yazar; okunan cümle **neon ışıkla** aydınlanır, kaldığın yeri kaybetmezsin
+- 🗣️ **Doğal, akıcı sesler** — Türkçe Emel/Ahmet dahil 300+ nöral ses (aşağıya bak)
+- 👆 **Jestler** — maskota: **tek tık** oku/duraklat · **çift tık** mini mod (sadece küçük kafa;
+  bir şey bitince minik konuşma balonu çıkar: "para-app · bitti") · **sürükle** taşı
+- 🌍 **Çok dilli** — mesajın dilini algılar, uygun sesi seçer
+- 🔇 **Sustur** = yalnız ses susar; görsel bildirimler devam eder
+- 🔒 **Gizli** — transcript'ler bilgisayarından çıkmaz; tarayıcı sesi tamamen çevrimdışı
 
 ### Nasıl çalışır?
 
-Claude Code her cevabı `~/.claude/projects/<proje>/<oturum>.jsonl` dosyasına yazar.
-Okur bu dosyaları arka planda izler, yeni cevabı görünce metni sadeleştirir (markdown/kod
-temizlenir), cümlelere böler ve okur. Ekran kazıma, eklenti, hile yok — sadece dosya okuma.
+Claude Code her oturumu `~/.claude/projects/**/*.jsonl` dosyasına yazar. Pofu bu dosyaları
+izler: dosya büyüyorsa oturum **çalışıyor**dur; yazma durunca yanıt **bitmiştir** (son cümle
+soruysa **onay bekliyor**). Ekran kazıma, eklenti, hile yok — sadece dosya okuma.
 
-### Kurulum
+## Kurulum
 
-Gereken: [Node.js](https://nodejs.org) 18+.
+**Kolay yol (Windows):** [Releases](https://github.com/sevgiikilic/pofu/releases/latest)
+sayfasından `Pofu-Setup.exe` indir, çalıştır. Bitti.
 
+**Geliştirici yolu:**
 ```bash
-git clone https://github.com/sevgiikilic/okur.git
-cd okur
+git clone https://github.com/sevgiikilic/pofu.git
+cd pofu
 npm install
-npm start
+npm start        # ya da Pofu.vbs'ye çift tıkla (konsolsuz)
 ```
 
-**Kolay çalıştırma (Windows):** her seferinde terminal açmak yerine:
-- **`Okur.vbs`'ye çift tıkla** — konsolsuz açılır. Masaüstüne kısayol at
-  (sağ tık → Kısayol oluştur; ikon olarak `assets\okur.ico` seçebilirsin).
-- Ya da Ayarlar (⚙) → **"Windows ile başlat"** işaretle — bilgisayar her açıldığında
-  Okur kendiliğinden gelir, hep köşede durur.
-- Zaten açıkken tekrar çalıştırırsan ikinci kopya açılmaz, mevcut pencere öne gelir.
+### Doğal sesler (şiddetle önerilir)
 
-Suratı köşeye sürükle (üstteki `⠿` tutamacından). Bir Claude Code oturumu aç, soru sor —
-cevap gelince Okur okumaya başlar. Uygulama sistem tepsisinde (tray) çalışır; oradan
-Göster/Gizle ve Çıkış yapabilirsin.
+Varsayılan Windows sesi robotiktir. 30 saniyelik kurulumla çok daha akıcı seslere geç:
 
-### Ayarlar (⚙ düğmesi)
+```bash
+cd chatterbox-server
+python -m venv .venv
+.venv\Scripts\pip install edge-tts
+```
+
+Pofu'yu yeniden başlat — ses sunucusunu kendisi açar, Ayarlar → Ses listesine
+**"Doğal sesler (sunucu)"** grubu gelir (tr-TR-Emel, tr-TR-Ahmet, en-US-Aria...).
+Detay + tamamen çevrimdışı Chatterbox seçeneği: [`chatterbox-server/README.md`](chatterbox-server/README.md)
+
+### Sağ tık → Oku (Chrome / Edge)
+
+`chrome://extensions` → Geliştirici modu → **Paketlenmemiş öğe yükle** →
+`browser-extension` klasörü. Detay: [`browser-extension/README.md`](browser-extension/README.md)
+
+## Ayarlar (⚙)
 
 | Ayar | Açıklama |
 |------|----------|
-| **Motor** | Otomatik / Tarayıcı sesi / Chatterbox |
+| **Motor** | Otomatik / Tarayıcı sesi / Ses sunucusu (doğal) |
 | **Ne okunsun** | Son paragraf (özet) / Son cümle / Tümü |
-| **Dil** | Otomatik (mesajdan algıla) veya sabit bir dil |
-| **Ses** | Belirli bir işletim sistemi sesi seç |
+| **Dil** | Otomatik (mesajdan algıla) veya sabit |
+| **Ses** | Doğal sunucu sesleri + Windows sesleri |
 | **Hız** | Konuşma hızı |
-| **Gelince otomatik SESLİ oku** | Yanıt bitince kendiliğinden sesli okusun mu (varsayılan **kapalı**) |
-| **Kod bloklarını atla** | Kodu sesli okumasın (önerilir) |
-| **Bildirim sesi (Bitti / Soru)** | Sesli "Bitti"/"Soru" bildirimini aç/kapat (varsayılan kapalı) |
-| **Titreme / yanıp sönme** | Görsel bildirimi aç/kapat |
-| **Kısayol** | Seçili/pano metnini okuma kısayolu (varsayılan `Ctrl+Alt+S`) |
-| **Proje süzgeci** | Yalnız adı eşleşen projeleri izle. Boş = hepsi. Tek proje: `para-app`. Birden çok: `para-app, okur` (virgülle). Küçük/büyük harf fark etmez, parça eşleşmesi yeter. |
-| **Windows ile başlat** | Bilgisayar açılınca Okur kendiliğinden başlasın |
-
-> **Susturmak için:** surattaki 🔊 düğmesine bas, ya da sistem tepsisindeki (tray) Okur
-> simgesine sağ tıkla → **Sustur**. Tamamen kapatmak için tepsi → **Çıkış** (veya Ayarlar → Çıkış).
-
-### Sağ tık → Oku (Chrome / Edge uzantısı)
-
-Chrome/Edge'de seçili metne **sağ tıkla → "Oku (Okur ile)"** demek için küçük bir uzantı var.
-Kurulum: `chrome://extensions` → Geliştirici modu → **Paketlenmemiş öğe yükle** →
-`browser-extension` klasörünü seç. Detay: [`browser-extension/README.md`](browser-extension/README.md).
-
-### Daha doğal ses (opsiyonel): Chatterbox
-
-Varsayılan tarayıcı sesi kurulumsuz çalışır. Daha doğal, tutarlı bir ses istersen
-[Chatterbox](https://github.com/resemble-ai/chatterbox) sunucusunu çalıştır —
-Okur onu otomatik algılar. Bkz. [`chatterbox-server/README.md`](chatterbox-server/README.md).
-
----
+| **Gelince otomatik SESLİ oku** | Varsayılan kapalı (metin öncelikli) |
+| **Kod bloklarını atla** | Kodu sesli okuma (önerilir) |
+| **Bitince titresin** | Görsel bildirim |
+| **Kopyalayınca oku** | Seç → Ctrl+C → oku |
+| **Proje süzgeci** | Boş = hepsi · `para-app` · `para-app, pofu` (virgülle çoklu) |
+| **Kısayol** | Pano okuma kısayolu (varsayılan `Ctrl+Alt+S`) |
 
 ## 🇬🇧 English
 
-Okur is a tiny floating face that reads **Claude Code**'s answers out loud while you do
-something else. It sits in a corner of your screen, on top of every app, and speaks each
-new answer. It marks where it is with a little **flame** ("lighter"), so when you pause you
-always know where you left off. It **shakes + says "Done"** when an answer lands and
-**blinks + says "Question"** when Claude is asking you something.
-
-It works by watching Claude Code's session transcripts
-(`~/.claude/projects/**/*.jsonl`) — no screen scraping, no plugins. Multilingual: it
-auto-detects each message's language and picks a matching voice. Private by default: the
-browser voice is fully offline; text never leaves your machine.
+Pofu is a tiny floating desktop companion for **Claude Code**. It watches your session
+transcripts (`~/.claude/projects/**/*.jsonl`) and shows a live session bar: **working**
+(animated), **waiting for approval** (glowing pulse), **done** (bright + summary). Click a
+row to jump to that VS Code window. It also reads any selected text aloud (right-click menu
+via the bundled Chrome extension, or Ctrl+C with read-on-copy) using natural neural voices
+(optional local `edge-tts` server; fully-offline Chatterbox also supported). Multilingual,
+private by default. Gestures: single-click = play/pause, double-click = mini mode with tiny
+speech-bubble notifications, drag to move.
 
 ```bash
-git clone https://github.com/sevgiikilic/okur.git
-cd okur && npm install && npm start
-```
-
-Optional [Chatterbox](https://github.com/resemble-ai/chatterbox) local server for
-higher-quality TTS — auto-detected when running (see `chatterbox-server/`).
-
----
-
-## Paketleme / Packaging
-
-Tek `.exe`/uygulama üretmek için (opsiyonel):
-
-```bash
-npm install --save-dev electron-builder
-npx electron-builder
+git clone https://github.com/sevgiikilic/pofu.git
+cd pofu && npm install && npm start
 ```
 
 ## Lisans / License
 
-MIT — bkz. [LICENSE](LICENSE).
-
-> Surat görseli Higgsfield ile üretilmiştir. / Mascot generated with Higgsfield.
+MIT — bkz. [LICENSE](LICENSE). Maskot Higgsfield ile üretilmiştir. / Mascot generated with Higgsfield.

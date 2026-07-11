@@ -5,7 +5,7 @@
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src http://127.0.0.1:* http://localhost:*; media-src 'self' blob: data:; font-src 'self';" />
   <link rel="stylesheet" href="face.css" />
-  <title>Okur</title>
+  <title>Pofu</title>
 </head>
 <body>
   <!-- Arka plan tamamen suruklenebilir; etkilesimli ogeler no-drag -->
@@ -24,6 +24,8 @@
         </div>
         <div id="cueBadge"></div>
       </div>
+      <!-- Mini mod konusma balonu: "para-app · bitti" + kisa baslik -->
+      <div id="bubble" class="hidden"><b id="bubbleHead"></b><span id="bubbleText"></span></div>
       <div id="headRight">
         <div id="controls">
           <button id="btnToggle" class="ctl primary" title="Oku / Duraklat">

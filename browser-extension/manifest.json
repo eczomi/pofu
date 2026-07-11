@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Okur — Sağ tık Oku",
+  "name": "Pofu — Sağ tık Oku",
   "version": "1.0.0",
-  "description": "Seçili metni sağ tıkla → Okur uygulamasında sesli okut.",
+  "description": "Seçili metni sağ tıkla → Pofu uygulamasında sesli okut.",
   "permissions": ["contextMenus"],
   "host_permissions": ["http://127.0.0.1/*"],
   "background": { "service_worker": "background.js" },

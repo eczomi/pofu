@@ -1,24 +1,75 @@
 {
-  "name": "okur",
-  "productName": "Okur",
+  "name": "pofu",
+  "productName": "Pofu",
   "version": "0.1.0",
-  "description": "Claude'un cevaplarini sesli okuyan, ekranda her seyin ustunde yuzen minik bir surat.",
+  "description": "Claude Code oturumlarini izleyen, biten/onay bekleyen sekmeleri gosteren ve secili metni sesli okuyan yuzen masaustu maskotu.",
   "main": "main.js",
   "scripts": {
     "start": "node launch.js",
     "start:direct": "electron .",
-    "dist": "electron-builder"
+    "dist": "electron-builder --win nsis"
   },
   "keywords": [
     "claude",
+    "claude-code",
     "tts",
     "text-to-speech",
+    "notifications",
     "electron",
     "assistant"
   ],
-  "author": "eczomi",
+  "author": "sevgiikilic",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^32.0.0"
+    "electron": "^32.0.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.sevgiikilic.pofu",
+    "productName": "Pofu",
+    "files": [
+      "main.js",
+      "preload.js",
+      "launch.js",
+      "src/**/*",
+      "renderer/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "src/focus-window.ps1",
+        "to": "focus-window.ps1"
+      },
+      {
+        "from": "chatterbox-server",
+        "to": "chatterbox-server",
+        "filter": [
+          "server.py",
+          "requirements.txt",
+          "README.md"
+        ]
+      },
+      {
+        "from": "browser-extension",
+        "to": "browser-extension"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/pofu.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "artifactName": "Pofu-Setup-${version}.${ext}"
+    }
   }
 }

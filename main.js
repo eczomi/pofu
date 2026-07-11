@@ -45,6 +45,18 @@ function configPath() {
   return process.env.OKUR_CONFIG || path.join(app.getPath('userData'), 'config.json');
 }
 
+// "Okur" adindan "Pofu"ya gecis: eski ayar dosyasi varsa bir kez tasi.
+function migrateOldConfig() {
+  try {
+    if (fs.existsSync(configPath()) || process.env.OKUR_CONFIG) return;
+    const old = path.join(app.getPath('appData'), 'Okur', 'config.json');
+    if (fs.existsSync(old)) {
+      fs.mkdirSync(path.dirname(configPath()), { recursive: true });
+      fs.copyFileSync(old, configPath());
+    }
+  } catch { /* yoksay */ }
+}
+
 function loadConfig() {
   let c;
   try {
@@ -77,8 +89,8 @@ function assetPath(name) {
 }
 
 function createWindow() {
-  const W = 296;
-  const H = 320;
+  const W = 248;
+  const H = 300;
   const area = screen.getPrimaryDisplay().workAreaSize;
   const x = config.x != null ? config.x : area.width - W - 28;
   const y = config.y != null ? config.y : 90;
@@ -142,11 +154,18 @@ function createWindow() {
 }
 
 // Surukleme bittikten sonra bekleyen boyutlandirmayi uygula
+// Istenen pencere boyutu — tasima ve boyutlandirma HEP birlikte (setBounds)
+// verilir; olcekli ekranlarda (%125 vb.) setPosition'in pencereyi sisirmesi
+// bilinen bir Electron hatasidir, bu yontem onu onler.
+let wantW = 248;
+let wantH = 300;
 let dragUntil = 0;
 let pendingSize = null;
 let pendingTimer = null;
 function applyResize(h, w) {
   if (!win || win.isDestroyed()) return;
+  if (w) wantW = w;
+  wantH = h;
   if (Date.now() < dragUntil) {
     pendingSize = { h, w };
     clearTimeout(pendingTimer);
@@ -155,10 +174,9 @@ function applyResize(h, w) {
     }, 750);
     return;
   }
-  const [curW, curH] = win.getContentSize();
-  const newW = w || curW;
-  if (Math.abs(curH - h) < 6 && Math.abs(curW - newW) < 6) return; // minik oynamalar
-  win.setContentSize(newW, h);
+  const b = win.getBounds();
+  if (Math.abs(b.height - wantH) < 6 && Math.abs(b.width - wantW) < 6) return;
+  win.setBounds({ x: b.x, y: b.y, width: wantW, height: wantH });
 }
 
 // "Windows ile baslat" ozelligi kaldirildi — eski kayit varsa temizle.
@@ -215,7 +233,7 @@ function createTray() {
 
   tray = new Tray(img);
   rebuildTrayMenu();
-  tray.setToolTip('Okur — Claude sesli okuyucu');
+  tray.setToolTip('Pofu — Claude yoldaşı');
   tray.on('click', () => toggleWindow());
 }
 
@@ -526,12 +544,13 @@ ipcMain.on('focus-session', (_e, payload) => {
   if (payload && payload.id) focusSession(payload.id);
 });
 
-// Maskottan tutup tasima (renderer elle surukler)
+// Maskottan tutup tasima (renderer elle surukler).
+// setBounds (konum+boyut birlikte): DPI olcekli ekranlarda buyume hatasini onler.
 ipcMain.handle('win-pos', () => (win && !win.isDestroyed()) ? win.getPosition() : [0, 0]);
 ipcMain.on('win-move', (_e, p) => {
   if (!win || win.isDestroyed() || !p) return;
   dragUntil = Date.now() + 700; // tasima sirasinda resize erteleme
-  win.setPosition(Math.round(p.x), Math.round(p.y));
+  win.setBounds({ x: Math.round(p.x), y: Math.round(p.y), width: wantW, height: wantH });
 });
 
 // Icerik boyutu degisti -> pencereyi icerige gore boyutla
@@ -573,6 +592,7 @@ if (!gotLock) {
   });
 
   app.whenReady().then(() => {
+    migrateOldConfig();
     config = loadConfig();
     createWindow();
     createTray();

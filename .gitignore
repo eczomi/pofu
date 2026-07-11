@@ -11,3 +11,7 @@ __pycache__/
 *.pyc
 # kullaniciya ozel ayar (userData'da tutulur ama yine de)
 config.local.json
+
+# fazladan maskot adaylari (repo disi)
+assets/okur2.png
+assets/okur3.png

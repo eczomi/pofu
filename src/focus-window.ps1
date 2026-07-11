@@ -1,4 +1,4 @@
-# Okur — basligi verilen metni iceren ilk gorunur pencereyi one getirir.
+# Pofu — basligi verilen metni iceren ilk gorunur pencereyi one getirir.
 # Kullanim: powershell -NoProfile -ExecutionPolicy Bypass -File focus-window.ps1 "para-app"
 # VS Code pencere basligi klasor adini icerir ("dosya - para-app - Visual Studio Code").
 # Not: Windows, arka plan sureclerinin pencere one getirmesini kisitlar;
@@ -9,7 +9,7 @@ Add-Type -TypeDefinition @"
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
-public static class OkurWin {
+public static class PofuWin {
   private delegate bool EnumProc(IntPtr hWnd, IntPtr lp);
   [DllImport("user32.dll")] private static extern bool EnumWindows(EnumProc cb, IntPtr lp);
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(IntPtr hWnd, StringBuilder sb, int max);
@@ -28,7 +28,7 @@ public static class OkurWin {
       StringBuilder sb = new StringBuilder(512);
       GetWindowText(h, sb, 512);
       string t = sb.ToString();
-      if (t.Length == 0 || t == "Okur") return true; // kendi penceremizi atla
+      if (t.Length == 0 || t == "Pofu") return true; // kendi penceremizi atla
       if (t.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0) {
         bool isCode = t.IndexOf("Visual Studio Code", StringComparison.OrdinalIgnoreCase) >= 0;
         if (isCode) { found = h; return false; } // VS Code -> hemen al
@@ -48,4 +48,4 @@ public static class OkurWin {
 }
 "@
 
-[OkurWin]::FocusByTitle($Needle)
+[PofuWin]::FocusByTitle($Needle)
