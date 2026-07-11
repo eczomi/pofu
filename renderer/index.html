@@ -42,6 +42,9 @@
           <button id="btnSpeak" class="ctl" title="Metin okut">
             <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 5h15a1 1 0 0 1 1 1v8.5a1 1 0 0 1-1 1H9.5l-4 3.5v-3.5h-1a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/><path d="M10.5 8.6v4.3l3.8-2.15-3.8-2.15Z" fill="currentColor" stroke="none"/></svg>
           </button>
+          <button id="btnNotes" class="ctl" title="Görevler panosu (kopyala → Ctrl+Alt+Q)">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 4.5V3.2A1.2 1.2 0 0 1 10.2 2h3.6A1.2 1.2 0 0 1 15 3.2v1.3"/><path d="m8.6 11 1.6 1.6L13.4 9.4"/><path d="M8.8 16.5h6.4"/></svg>
+          </button>
           <button id="btnSettings" class="ctl" title="Ayarlar">
             <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .34 1.87l.05.05a2 2 0 1 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.13a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 0 1 0-4h.13a1.7 1.7 0 0 0 1.56-1.11 1.7 1.7 0 0 0-.34-1.87l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05a1.7 1.7 0 0 0 1.87.34h.08A1.7 1.7 0 0 0 10 4.73V4a2 2 0 0 1 4 0v.13a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.05-.05a2 2 0 1 1 2.83 2.83l-.05.05a1.7 1.7 0 0 0-.34 1.87v.08a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 0 1 0 4h-.13a1.7 1.7 0 0 0-1.47 1.06Z"/></svg>
           </button>
@@ -53,6 +56,16 @@
     <!-- Oturum bari: hangi sekme calisiyor / onay bekliyor / bitti -->
     <div id="sessions" class="sheet hidden">
       <div id="sessionList"></div>
+    </div>
+
+    <!-- Gorevler panosu: kopyala -> kisayol -> buraya duser (OKUMAZ; ▶ ile okunur) -->
+    <div id="notes" class="sheet hidden">
+      <div class="cap-head">
+        <span>Görevler</span>
+        <button id="btnNotesClose" class="cap-close" title="Paneli kapat">×</button>
+      </div>
+      <div id="noteList"></div>
+      <div class="hint" id="noteHint"></div>
     </div>
 
     <!-- Metin okut kutusu -->
@@ -116,6 +129,10 @@
       <div class="srow">
         <label>Kısayol</label>
         <input id="setHotkey" type="text" placeholder="CommandOrControl+Alt+S" />
+      </div>
+      <div class="srow">
+        <label>Not kısayolu</label>
+        <input id="setNoteHotkey" type="text" placeholder="CommandOrControl+Alt+Q" />
       </div>
       <div class="srow foot">
         <span id="status" class="hint"></span>

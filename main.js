@@ -26,6 +26,8 @@ const DEFAULT_CONFIG = {
   muted: false,                            // ana sustur: acikken hicbir sey okumaz/titremez
   projectFilter: '',                       // yalniz bu proje klasorunu izle ('' = hepsi)
   hotkey: 'CommandOrControl+Alt+S',        // secili/pano metni okuma kisayolu
+  noteHotkey: 'CommandOrControl+Alt+Q',    // panodaki metni Gorevler panosuna at (OKUMAZ)
+  notes: [],                               // gorevler panosu icerigi (kalici)
   httpPort: 7889,                          // taray ici uzanti buraya metin yollar (sag tik -> Oku)
   readOnCopy: true,                        // sec + kopyala (Ctrl+C) -> otomatik oku
   miniMode: false,                         // cift tik: yalniz maskot (mini) modu
@@ -481,17 +483,38 @@ function manualRead(rawText) {
   }
 }
 
+// Panodaki metni Gorevler panosuna at (OKUMAZ — kullanici ▶ ile okutur)
+function addNoteFromClipboard() {
+  let t = '';
+  try { t = (clipboard.readText() || '').trim(); } catch { t = ''; }
+  if (!t) return;
+  if (win && !win.isDestroyed()) {
+    if (!win.isVisible()) win.show();
+    win.webContents.send('command', { action: 'add-note', text: t });
+  }
+}
+
+let noteHotkeyOk = false;
 function registerHotkey() {
   try { globalShortcut.unregisterAll(); } catch { /* */ }
   const acc = (config.hotkey || '').trim();
+  const nAcc = (config.noteHotkey || '').trim();
   hotkeyOk = false;
+  noteHotkeyOk = false;
   if (acc) {
     try { hotkeyOk = globalShortcut.register(acc, () => manualRead(clipboard.readText())); }
     catch { hotkeyOk = false; }
   }
-  dlog('kisayol', acc, hotkeyOk ? 'kayitli' : 'KAYIT EDILEMEDI (baska uygulama kullaniyor olabilir)');
+  if (nAcc) {
+    try { noteHotkeyOk = globalShortcut.register(nAcc, addNoteFromClipboard); }
+    catch { noteHotkeyOk = false; }
+  }
+  dlog('kisayol', acc, hotkeyOk ? 'ok' : 'KAYIT EDILEMEDI', '| not:', nAcc, noteHotkeyOk ? 'ok' : 'KAYIT EDILEMEDI');
   if (win && !win.isDestroyed()) {
-    win.webContents.send('command', { action: 'hotkey', ok: hotkeyOk, hotkey: acc });
+    win.webContents.send('command', {
+      action: 'hotkey', ok: hotkeyOk, hotkey: acc,
+      noteOk: noteHotkeyOk, noteHotkey: nAcc,
+    });
   }
   return hotkeyOk;
 }
@@ -534,7 +557,10 @@ function startApiServer() {
 // ---- IPC ----
 ipcMain.on('renderer-ready', (e) => {
   e.sender.send('config', config);
-  e.sender.send('command', { action: 'hotkey', ok: hotkeyOk, hotkey: config.hotkey });
+  e.sender.send('command', {
+    action: 'hotkey', ok: hotkeyOk, hotkey: config.hotkey,
+    noteOk: noteHotkeyOk, noteHotkey: config.noteHotkey,
+  });
   startWatcher();
   sendSessions();
 });
@@ -568,7 +594,9 @@ ipcMain.on('save-config', (_e, partial) => {
   const filterChanged = partial && 'projectFilter' in partial &&
     partial.projectFilter !== config.projectFilter;
   const mutedChanged = partial && 'muted' in partial && partial.muted !== config.muted;
-  const hotkeyChanged = partial && 'hotkey' in partial && partial.hotkey !== config.hotkey;
+  const hotkeyChanged = partial && (
+    ('hotkey' in partial && partial.hotkey !== config.hotkey) ||
+    ('noteHotkey' in partial && partial.noteHotkey !== config.noteHotkey));
   config = { ...config, ...partial };
   saveConfig();
   if (mutedChanged) rebuildTrayMenu();

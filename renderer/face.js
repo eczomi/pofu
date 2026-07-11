@@ -14,6 +14,8 @@ let cfg = {
   muted: false,
   projectFilter: '',
   hotkey: 'CommandOrControl+Alt+S',
+  noteHotkey: 'CommandOrControl+Alt+Q',
+  notes: [],
   readOnCopy: true,
 };
 
@@ -590,15 +592,101 @@ function applyConfigToUI() {
   $('#setCueFlash').checked = !!cfg.cueFlash;
   $('#setFilter').value = cfg.projectFilter || '';
   $('#setHotkey').value = cfg.hotkey || '';
+  $('#setNoteHotkey').value = cfg.noteHotkey || '';
   $('#setReadOnCopy').checked = !!cfg.readOnCopy;
   setHotkeyHint(cfg.hotkey, undefined);
   applyMuted(!!cfg.muted);
   applyMini(!!cfg.miniMode);
+  renderNotes();
+  if ((cfg.notes || []).length) $('#notes').classList.remove('hidden');
 }
 
 function save(partial) {
   cfg = { ...cfg, ...partial };
   window.okur.saveConfig(partial);
+}
+
+// ---- Gorevler panosu ----
+// Kopyala -> not kisayolu -> buraya duser. OKUMAZ; her notun ▶'u ile okunur.
+// Satirlar tiklanabilir todo maddeleridir: isaretledikce ustu cizilir.
+function noteId() { return 'n' + Math.random().toString(36).slice(2, 9); }
+
+function addNote(text) {
+  const t = (text || '').trim();
+  if (!t) return;
+  const notes = cfg.notes || [];
+  notes.unshift({ id: noteId(), text: t, done: {} });
+  while (notes.length > 20) notes.pop();
+  save({ notes });
+  renderNotes();
+  // Paneli goster (mini moddaysa cikar)
+  if (cfg.miniMode) { applyMini(false); window.okur.saveConfig({ miniMode: false }); }
+  $('#settings').classList.add('hidden');
+  $('#speakBox').classList.add('hidden');
+  $('#notes').classList.remove('hidden');
+  requestResize();
+}
+
+function renderNotes() {
+  const listEl = $('#noteList');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+  const notes = cfg.notes || [];
+  for (const n of notes) {
+    const box = document.createElement('div');
+    box.className = 'note';
+
+    const head = document.createElement('div');
+    head.className = 'note-head';
+
+    const play = document.createElement('button');
+    play.className = 'slisten';
+    play.title = 'Bu notu sesli oku';
+    play.innerHTML = LISTEN_SVG;
+    play.addEventListener('click', (e) => { e.stopPropagation(); window.okur.readText(n.text); });
+
+    const time = document.createElement('span');
+    time.className = 'note-count';
+    const lines = n.text.split(/\n+/).map((s) => s.trim()).filter(Boolean);
+    const doneCount = Object.values(n.done || {}).filter(Boolean).length;
+    time.textContent = doneCount + '/' + lines.length;
+
+    const del = document.createElement('button');
+    del.className = 'cap-close';
+    del.title = 'Notu sil';
+    del.textContent = '×';
+    del.addEventListener('click', (e) => {
+      e.stopPropagation();
+      save({ notes: (cfg.notes || []).filter((x) => x.id !== n.id) });
+      renderNotes();
+      requestResize();
+    });
+
+    head.appendChild(play);
+    head.appendChild(time);
+    head.appendChild(del);
+    box.appendChild(head);
+
+    lines.forEach((line, i) => {
+      const row = document.createElement('div');
+      row.className = 'note-line' + ((n.done || {})[i] ? ' done' : '');
+      row.textContent = line;
+      row.title = 'Tıkla: yapıldı işaretle';
+      row.addEventListener('click', () => {
+        n.done = n.done || {};
+        n.done[i] = !n.done[i];
+        save({ notes: cfg.notes });
+        renderNotes();
+      });
+      box.appendChild(row);
+    });
+
+    listEl.appendChild(box);
+  }
+  const hint = $('#noteHint');
+  if (hint) hint.textContent = notes.length
+    ? ''
+    : 'Kopyala → ' + prettyHotkey(cfg.noteHotkey) + ' → adımlar buraya düşer. Satıra tıkla: yapıldı.';
 }
 
 // ---- Maskot jestleri: tut-tasi / tek tik = oynat-duraklat / cift tik = mini mod ----
@@ -685,6 +773,18 @@ function bindUI() {
     e.stopPropagation();
     $('#caption').classList.add('hidden');
   });
+  // Gorevler panosu ac/kapat
+  $('#btnNotes').addEventListener('click', (e) => {
+    e.stopPropagation();
+    $('#settings').classList.add('hidden');
+    $('#speakBox').classList.add('hidden');
+    $('#notes').classList.toggle('hidden');
+    renderNotes();
+  });
+  $('#btnNotesClose').addEventListener('click', (e) => {
+    e.stopPropagation();
+    $('#notes').classList.add('hidden');
+  });
   $('#btnQuit').addEventListener('click', () => window.okur.quit());
 
   $('#setEngine').addEventListener('change', (e) => { save({ engine: e.target.value }); detectEngine(); });
@@ -704,6 +804,7 @@ function bindUI() {
     save({ hotkey: e.target.value.trim() });
     setHotkeyHint(e.target.value.trim(), undefined);
   });
+  $('#setNoteHotkey').addEventListener('change', (e) => save({ noteHotkey: e.target.value.trim() }));
   $('#setReadOnCopy').addEventListener('change', (e) => save({ readOnCopy: e.target.checked }));
 }
 
@@ -724,6 +825,7 @@ window.okur.onCommand((msg) => {
   else if (action === 'muted-on') applyMuted(true);
   else if (action === 'muted-off') applyMuted(false);
   else if (action === 'hotkey') setHotkeyHint(msg.hotkey, msg.ok);
+  else if (action === 'add-note') addNote(msg.text);
 });
 
 // Pencereyi icerige gore boyutla (bos/seffaf alan tiklama yutmasin).

@@ -440,6 +440,48 @@ button, select, input, textarea, .sheet, #face {
 }
 #app.paused .line.lit::before { animation: pulse 1.3s ease-in-out infinite; }
 
+/* --- Gorevler panosu --- */
+#notes { max-height: 200px; overflow-y: auto; scrollbar-width: thin; }
+#notes::-webkit-scrollbar { width: 4px; }
+#notes::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 2px; }
+.note {
+  background: rgba(147, 112, 250, 0.06);
+  border: 1px solid rgba(167, 139, 250, 0.16);
+  border-radius: 9px;
+  padding: 4px 6px 6px;
+  margin-bottom: 5px;
+}
+.note-head {
+  display: flex; align-items: center; gap: 5px;
+  justify-content: flex-end;
+  padding-bottom: 2px;
+}
+.note-count { font-size: 9px; color: var(--ink-faint); margin-right: auto; padding-left: 2px; }
+.note-line {
+  position: relative;
+  font-size: 11px; line-height: 1.45;
+  color: var(--ink-dim);
+  padding: 2px 4px 2px 17px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.note-line::before {
+  content: "";
+  position: absolute; left: 4px; top: 7px;
+  width: 8px; height: 8px;
+  border: 1.5px solid rgba(167, 139, 250, 0.5);
+  border-radius: 3px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.note-line:hover { background: rgba(167, 139, 250, 0.1); color: var(--ink); }
+.note-line.done { color: var(--ink-faint); text-decoration: line-through; }
+.note-line.done::before {
+  background: var(--ok);
+  border-color: var(--ok);
+  box-shadow: 0 0 5px rgba(126, 226, 168, 0.6);
+}
+
 /* --- Metin okut kutusu --- */
 #speakText {
   width: 100%; min-height: 46px; max-height: 100px; resize: vertical;
