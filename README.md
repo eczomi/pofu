@@ -2,9 +2,9 @@
   <img src="assets/face.png" width="130" alt="Pofu" />
 
   <h1>Pofu</h1>
-  <p><b>Claude Code yoldaşın: ekranda yüzen minik maskot.</b><br/>
-  Hangi sekme çalışıyor, hangisi onay bekliyor, hangisi bitti — tek bakışta.
-  İstersen seçtiğin her metni doğal bir sesle okur.</p>
+  <p><b>Ekranda yüzen minik ekran okuyucu maskot.</b><br/>
+  Seçtiğin her metni doğal bir sesle okur — göz yorgunluğuna ve görme
+  zorluklarına birebir. Claude Code kullananlara ayrıca oturum takibi sunar.</p>
 
   <p>
     <a href="https://github.com/eczomi/pofu/releases/latest"><b>⬇️ İndir (Windows) — Pofu-Setup.exe</b></a>
@@ -15,17 +15,28 @@
 
 ## 🇹🇷 Ne yapar?
 
-Aynı anda 5 projede 10 Claude sekmesiyle mi çalışıyorsun? Pofu köşede durur,
-sen başka işlere bakarken sekmelerini izler:
+### Ekran okuyucu (herkes için)
 
-- 🔔 **Oturum barı** — her Claude oturumu canlı bir satır:
-  **çalışıyor** = akan ışık çubuğu · **onay bekliyor** = parlak nabız · **bitti** = parlak ✓ + son mesajın özeti
-- 🖱️ **Satıra tıkla → o pencereye git** — VS Code'daki o pencere öne gelir
+Gözlerin yoruldu mu, uzun bir yazıyı dinlemek mi istiyorsun? Pofu kenarda durur:
+
 - ✋ **Seçtiğin metni okut** (web sayfası, kitap, PDF; yapıştırmadan):
   - **Sağ tık → "Oku (Pofu ile)"** — Chrome/Edge uzantısıyla (`browser-extension/`)
   - **Seç → Ctrl+C** — "Kopyalayınca oku" açıkken her uygulamada
   - **Kısayol** `Ctrl+Alt+S` — panodaki metni okur
   - Ne okuduğu üstünde yazar; okunan cümle **neon ışıkla** aydınlanır, kaldığın yeri kaybetmezsin
+- ⏯️ **Kuyruk** — üst üste birkaç şey gönderirsen sırayla okur, yarıda kesmez;
+  **■** düğmesi okumayı tamamen iptal eder (kuyruk dahil)
+- 📋 **Görevler panosu** — adım adım talimatı kopyala → `Ctrl+Alt+Q` → tik'lenebilir
+  todo listesi olur; sesli OKUMAZ, istersen ▶ ile dinlersin
+
+### Claude Code takibi (isteğe bağlı — Ayarlar'dan aç/kapa)
+
+Aynı anda 5 projede 10 Claude sekmesiyle çalışanlara:
+
+- 🔔 **Oturum barı** — her Claude oturumu canlı bir satır:
+  **çalışıyor** = akan ışık çubuğu · **onay bekliyor** = parlak nabız · **bitti** = parlak ✓ + son mesajın özeti
+- 🖱️ **Satıra tıkla → o pencereye git** — VS Code'daki o pencere öne gelir
+- Kullanmıyorsan Ayarlar → **"Claude oturum takibi"** kapat: Pofu saf ekran okuyucu olur
 - 🗣️ **Doğal, akıcı sesler** — Türkçe Emel/Ahmet dahil 300+ nöral ses (aşağıya bak)
 - 👆 **Jestler** — maskota: **tek tık** oku/duraklat · **çift tık** mini mod (sadece küçük kafa;
   bir şey bitince minik konuşma balonu çıkar: "para-app · bitti") · **sürükle** taşı
@@ -76,6 +87,7 @@ Detay + tamamen çevrimdışı Chatterbox seçeneği: [`chatterbox-server/README
 | Ayar | Açıklama |
 |------|----------|
 | **Motor** | Otomatik / Tarayıcı sesi / Ses sunucusu (doğal) |
+| **Claude oturum takibi** | Kapat → Pofu saf ekran okuyucu (VS Code gerekmez) |
 | **Ne okunsun** | Son paragraf (özet) / Son cümle / Tümü |
 | **Dil** | Otomatik (mesajdan algıla) veya sabit |
 | **Ses** | Doğal sunucu sesleri + Windows sesleri |

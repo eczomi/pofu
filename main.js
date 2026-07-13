@@ -19,6 +19,7 @@ const DEFAULT_CONFIG = {
   language: 'auto',                        // 'auto' veya 'tr','en','de',... (TTS dili)
   voiceName: '',                           // belirli bir tarayici sesi; '' = otomatik
   skipCode: true,                          // kod bloklarini okuma
+  claudeMode: true,                        // Claude Code oturum takibi (VS Code) — kapali = saf ekran okuyucu
   autoRead: false,                         // metin-oncelikli: varsayilan otomatik SESLI okuma KAPALI
   readScope: 'lastParagraph',              // 'all' | 'lastParagraph' | 'lastSentence' — ne okunsun
   settleMs: 2500,                          // yanit "bitti" sayilmadan once beklenen sessizlik (ms)
@@ -391,9 +392,12 @@ function flush(file) {
 }
 
 function startWatcher() {
-  if (watcher) watcher.stop();
+  if (watcher) { watcher.stop(); watcher = null; }
   clearBuffers();
   sessions.clear();
+  sendSessions();
+  // Saf ekran okuyucu modu: Claude takibi kapali — izleyici hic baslamaz
+  if (!config.claudeMode) { dlog('claude modu kapali; izleyici yok'); return; }
   watcher = new TranscriptWatcher({
     projectFilter: config.projectFilter,
     onText: onAssistantText,
@@ -591,8 +595,9 @@ ipcMain.on('resize', (_e, payload) => {
 ipcMain.on('state', () => { /* ileride tray ipucu guncellenebilir */ });
 
 ipcMain.on('save-config', (_e, partial) => {
-  const filterChanged = partial && 'projectFilter' in partial &&
-    partial.projectFilter !== config.projectFilter;
+  const filterChanged = partial && (
+    ('projectFilter' in partial && partial.projectFilter !== config.projectFilter) ||
+    ('claudeMode' in partial && partial.claudeMode !== config.claudeMode));
   const mutedChanged = partial && 'muted' in partial && partial.muted !== config.muted;
   const hotkeyChanged = partial && (
     ('hotkey' in partial && partial.hotkey !== config.hotkey) ||

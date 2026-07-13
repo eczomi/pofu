@@ -8,6 +8,7 @@ let cfg = {
   language: 'auto',
   voiceName: '',
   skipCode: true,
+  claudeMode: true,
   autoRead: false,
   readScope: 'lastParagraph',
   cueFlash: true,
@@ -223,6 +224,7 @@ function resume() {
   }
 }
 
+// ■ = okuma gorevini IPTAL: ses durur, kuyruk ve altyazi temizlenir.
 function stopAll() {
   stopped = true;
   gen++; // bekleyen onend'leri gecersiz kil
@@ -231,7 +233,14 @@ function stopAll() {
   clearNowReading();
   if (engine === 'browser') { try { speechSynthesis.cancel(); } catch { /* */ } }
   else { try { audio.pause(); audio.currentTime = 0; } catch { /* */ } }
-  // idx yerinde kalir: "son kaldigin yer" alevle isikli durmaya devam eder.
+  // Kuyrugu bosalt
+  sentences = [];
+  idx = -1;
+  const lines = $('#lines');
+  if (lines) lines.innerHTML = '';
+  const cap = $('#caption');
+  if (cap) cap.classList.add('hidden');
+  requestResize();
 }
 
 function toggle() {
@@ -291,6 +300,11 @@ function highlight(i) {
   }
   const cur = sentences[i];
   if (cur && cur.el) cur.el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  // Kuyruktaki yeni bloga gecince "ne okunuyor" etiketini guncelle
+  if (cur && cur.label) {
+    const nr = $('#nowReading');
+    if (nr) nr.textContent = 'Okunuyor: ' + cur.label;
+  }
 }
 
 // ---- Surat durumu + ipuclari ----
@@ -393,12 +407,27 @@ const STATUS_TEXT = { working: 'çalışıyor', approval: 'onay bekliyor', done:
 // Her oturumun son mesaji (dinle dugmesi icin)
 const lastMsgs = new Map(); // id -> { sentences, lang, label, title }
 
-// Bir metni HEMEN oku (sağ tık / kısayol / oturum dinle) + ne okunduğunu yaz.
+// Bir metni oku (sağ tık / kısayol / oturum dinle) + ne okunduğunu yaz.
+// KUYRUK: zaten okuma sürüyorsa yarıda kesmez — sona eklenir, sırası gelince okunur.
 function readNow(list, lang, label, title) {
-  const nr = $('#nowReading');
-  if (nr) nr.textContent = title ? ('Okunuyor: ' + title) : (label || '');
   const startIdx = sentences.length;
   addSentences(list, lang, label);
+
+  if (state === 'playing') {
+    // Sıraya eklendi — kısa geri bildirim göster
+    const badge = $('#cueBadge');
+    if (badge && !cfg.miniMode) {
+      badge.textContent = 'sıraya eklendi';
+      badge.classList.remove('q');
+      badge.classList.add('show');
+      clearTimeout(cueTimer);
+      cueTimer = setTimeout(() => badge.classList.remove('show'), 1400);
+    }
+    return; // playFrom akışı mevcut cümleler bitince buraya kendiliğinden gelir
+  }
+
+  const nr = $('#nowReading');
+  if (nr) nr.textContent = title ? ('Okunuyor: ' + title) : (label || '');
   jumpTo(startIdx);
 }
 
@@ -587,6 +616,7 @@ function applyConfigToUI() {
   populateVoiceSelect();
   $('#setRate').value = cfg.rate;
   $('#rateVal').textContent = (Number(cfg.rate).toFixed(2)) + 'x';
+  $('#setClaudeMode').checked = cfg.claudeMode !== false;
   $('#setAutoRead').checked = !!cfg.autoRead;
   $('#setSkipCode').checked = !!cfg.skipCode;
   $('#setCueFlash').checked = !!cfg.cueFlash;
@@ -847,6 +877,7 @@ function bindUI() {
     save({ rate: r });
   });
   $('#setScope').addEventListener('change', (e) => save({ readScope: e.target.value }));
+  $('#setClaudeMode').addEventListener('change', (e) => save({ claudeMode: e.target.checked }));
   $('#setAutoRead').addEventListener('change', (e) => save({ autoRead: e.target.checked }));
   $('#setSkipCode').addEventListener('change', (e) => save({ skipCode: e.target.checked }));
   $('#setCueFlash').addEventListener('change', (e) => save({ cueFlash: e.target.checked }));

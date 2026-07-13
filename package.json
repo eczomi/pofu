@@ -1,8 +1,8 @@
 {
   "name": "pofu",
   "productName": "Pofu",
-  "version": "0.1.0",
-  "description": "Claude Code oturumlarini izleyen, biten/onay bekleyen sekmeleri gosteren ve secili metni sesli okuyan yuzen masaustu maskotu.",
+  "version": "0.1.1",
+  "description": "Ekranda yuzen minik ekran okuyucu maskot: secili metni dogal sesle okur; istege bagli Claude Code oturum takibi (calisiyor/onay bekliyor/bitti).",
   "main": "main.js",
   "scripts": {
     "start": "node launch.js",
