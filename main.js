@@ -6,34 +6,45 @@ const fs = require('fs');
 const http = require('http');
 
 const { TranscriptWatcher } = require('./src/transcript');
-const { toSentences, scopedText } = require('./src/clean');
+const { toSentences, scopedText, stripMarkdown } = require('./src/clean');
 const { detect } = require('./src/detectLang');
+const { translate, normLang } = require('./src/translate');
 
 const DEBUG = !!process.env.OKUR_DEBUG;
 function dlog(...a) { if (DEBUG) console.log('[okur]', ...a); }
 
+const WIN_W = 320;   // normal genislik
+const MINI_W = 76;   // mini mod genisligi
+
 const DEFAULT_CONFIG = {
+  // --- Kolay mod ---
+  autoMode: true,                          // acikken motor/dil/ses kendiliginden secilir
+  translate: true,                         // yabanci dildeki metni "benim dilim"e cevir
+  targetLang: '',                          // benim dilim; '' = sistem dili
+  readWhat: 'translation',                 // 'translation' | 'original' | 'both' — hangisi seslendirilsin
+  voiceGender: 'female',                   // 'female' | 'male' — her dilde tercih edilen ses tipi
+  // --- Gelismis ---
   engine: 'auto',                          // 'auto' | 'browser' | 'chatterbox'
   chatterboxUrl: 'http://127.0.0.1:7888',
   rate: 1.0,                               // konusma hizi
-  language: 'auto',                        // 'auto' veya 'tr','en','de',... (TTS dili)
-  voiceName: '',                           // belirli bir tarayici sesi; '' = otomatik
+  language: 'auto',                        // TTS dili: 'auto' ya da sabit kod (autoMode kapaliyken)
+  voiceByLang: {},                         // dil -> ses adi (autoMode kapaliyken)
   skipCode: true,                          // kod bloklarini okuma
-  claudeMode: true,                        // Claude Code oturum takibi (VS Code) — kapali = saf ekran okuyucu
-  autoRead: false,                         // metin-oncelikli: varsayilan otomatik SESLI okuma KAPALI
-  readScope: 'lastParagraph',              // 'all' | 'lastParagraph' | 'lastSentence' — ne okunsun
-  settleMs: 2500,                          // yanit "bitti" sayilmadan once beklenen sessizlik (ms)
-  cueFlash: true,                          // bitince titreme + yazili rozet
-  muted: false,                            // ana sustur: acikken hicbir sey okumaz/titremez
-  projectFilter: '',                       // yalniz bu proje klasorunu izle ('' = hepsi)
-  hotkey: 'CommandOrControl+Alt+S',        // secili/pano metni okuma kisayolu
-  noteHotkey: 'CommandOrControl+Alt+Q',    // panodaki metni Gorevler panosuna at (OKUMAZ)
-  notes: [],                               // gorevler panosu icerigi (kalici)
-  httpPort: 7889,                          // taray ici uzanti buraya metin yollar (sag tik -> Oku)
-  readOnCopy: true,                        // sec + kopyala (Ctrl+C) -> otomatik oku
-  miniMode: false,                         // cift tik: yalniz maskot (mini) modu
-  cfgVersion: 3,                           // ayar goc surumu
-  x: null, y: null,                        // pencere konumu (hafiza)
+  claudeMode: true,                        // Claude Code oturum takibi
+  autoRead: false,                         // Claude yaniti gelince otomatik SESLI oku
+  readScope: 'lastParagraph',              // 'all' | 'lastParagraph' | 'lastSentence'
+  settleMs: 2500,
+  cueFlash: true,
+  muted: false,
+  projectFilter: '',
+  hotkey: 'CommandOrControl+Alt+S',
+  noteHotkey: 'CommandOrControl+Alt+Q',
+  notes: [],
+  httpPort: 7889,
+  readOnCopy: true,
+  miniMode: false,
+  cfgVersion: 4,
+  x: null, y: null,
 };
 
 let win = null;
@@ -44,11 +55,9 @@ let lastLang = 'en';
 let hotkeyOk = false;
 
 function configPath() {
-  // Test/tanilama icin OKUR_CONFIG ile ozel dosya gosterilebilir.
   return process.env.OKUR_CONFIG || path.join(app.getPath('userData'), 'config.json');
 }
 
-// "Okur" adindan "Pofu"ya gecis: eski ayar dosyasi varsa bir kez tasi.
 function migrateOldConfig() {
   try {
     if (fs.existsSync(configPath()) || process.env.OKUR_CONFIG) return;
@@ -63,23 +72,33 @@ function migrateOldConfig() {
 function loadConfig() {
   let c;
   try {
-    const raw = fs.readFileSync(configPath(), 'utf8');
-    c = { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+    c = { ...DEFAULT_CONFIG, ...JSON.parse(fs.readFileSync(configPath(), 'utf8')) };
   } catch {
     c = { ...DEFAULT_CONFIG };
   }
-  // Goc v2: metin-oncelikli surume gecis — eski kayitli autoRead=true'yu bir
-  // kereligine kapat (kullanici sonra ayardan bilincli acabilir).
-  if (!c.cfgVersion || c.cfgVersion < 2) {
-    c.autoRead = false;
+  if (!c.cfgVersion || c.cfgVersion < 2) c.autoRead = false;
+  if (!c.cfgVersion || c.cfgVersion < 3) c.readOnCopy = true;
+  // Goc v4: kolay mod + ceviri. Eski "tek sabit ses" ayari dil uyumsuzluguna
+  // yol aciyordu (her dili ayni kisi okuyordu); dil bazli secime tasindi.
+  if (!c.cfgVersion || c.cfgVersion < 4) {
+    c.autoMode = true;
+    c.engine = 'auto';
+    c.language = 'auto';
+    c.translate = true;
+    c.readWhat = 'translation';
+    const old = String(c.voiceName || '');
+    c.voiceByLang = {};
+    if (old) {
+      const m = old.match(/^([a-z]{2})-[A-Z]{2}-/);
+      if (m) c.voiceByLang[m[1]] = old;
+      c.voiceGender = /Ahmet|Guy|Christopher|Eric|Andrew|Brian|Roger|Steffan|David|Mark|Tolga|Conrad|Henri|Alvaro|Diego|Antonio|Maarten|Marek|Mattias|Dmitry|Keita|InJoon|Yunxi|Hamed|Madhur|Nestoras|Avri|Niwat/i.test(old) ? 'male' : 'female';
+    }
+    c.cfgVersion = 4;
   }
-  // Goc v3: "kopyalayinca oku" geri geldi (istek uzerine) — bir kereligine ac.
-  if (!c.cfgVersion || c.cfgVersion < 3) {
-    c.readOnCopy = true;
-    c.cfgVersion = 3;
-  }
-  delete c.startWithWindows; // kaldirilan ozellik
-  delete c.cueSound;         // kaldirilan ozellik (sesli Bitti/Soru)
+  delete c.voiceName;
+  delete c.startWithWindows;
+  delete c.cueSound;
+  if (!c.voiceByLang || typeof c.voiceByLang !== 'object') c.voiceByLang = {};
   return c;
 }
 
@@ -87,16 +106,30 @@ function saveConfig() {
   try { fs.writeFileSync(configPath(), JSON.stringify(config, null, 2)); } catch { /* yoksay */ }
 }
 
+// "Benim dilim": ayar bos ise sistem dili (tr-TR -> tr)
+function targetLang() {
+  const t = normLang(config.targetLang);
+  if (t) return t;
+  try { return normLang(app.getLocale()) || 'tr'; } catch { return 'tr'; }
+}
+
+function publicConfig() {
+  return { ...config, targetLangResolved: targetLang() };
+}
+
 function assetPath(name) {
   return path.join(__dirname, 'assets', name);
 }
 
 function createWindow() {
-  const W = 248;
+  const W = WIN_W;
   const H = 300;
   const area = screen.getPrimaryDisplay().workAreaSize;
-  const x = config.x != null ? config.x : area.width - W - 28;
-  const y = config.y != null ? config.y : 90;
+  let x = config.x != null ? config.x : area.width - W - 28;
+  let y = config.y != null ? config.y : 90;
+  // Ekran disinda kalmasin (cozunurluk degismis olabilir)
+  x = Math.max(0, Math.min(x, area.width - 80));
+  y = Math.max(0, Math.min(y, area.height - 80));
 
   win = new BrowserWindow({
     width: W,
@@ -120,10 +153,8 @@ function createWindow() {
     },
   });
 
-  // Tam ekran uygulamalarin (Chrome tam ekran video, sunum, oyun) uzerinde de kal.
   win.setAlwaysOnTop(true, 'screen-saver');
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
   if (DEBUG) {
@@ -131,19 +162,27 @@ function createWindow() {
     win.webContents.on('did-finish-load', () => dlog('renderer yuklendi'));
   }
 
-  // Suruklerken pencereyi YENIDEN BOYUTLANDIRMA — Windows'ta programatik
-  // boyutlandirma suruklemeyi iptal eder ("donma" hissi). Tasima bitene
-  // kadar boyutlandirmayi ertele.
-  win.on('will-move', () => {
-    dragUntil = Date.now() + 700;
-  });
+  // Gelistirici: OKUR_SHOT=dosya.png -> yuklendikten sonra ekran goruntusu al.
+  if (process.env.OKUR_SHOT) {
+    win.webContents.on('did-finish-load', () => {
+      setTimeout(async () => {
+        try {
+          const img = await win.webContents.capturePage();
+          fs.writeFileSync(process.env.OKUR_SHOT, img.toPNG());
+          dlog('ekran goruntusu:', process.env.OKUR_SHOT);
+        } catch (e) { dlog('goruntu alinamadi:', e.message); }
+        if (process.env.OKUR_SHOT_QUIT) { app.isQuiting = true; app.quit(); }
+      }, Number(process.env.OKUR_SHOT_DELAY || 4000));
+    });
+  }
+
+  win.on('will-move', () => { dragUntil = Date.now() + 700; });
 
   let moveSaveTimer = null;
   const savePos = () => {
     if (!win || win.isDestroyed()) return;
     const [nx, ny] = win.getPosition();
-    config.x = nx;
-    config.y = ny;
+    config.x = nx; config.y = ny;
     saveConfig();
   };
   win.on('moved', savePos);
@@ -156,11 +195,9 @@ function createWindow() {
   win.on('closed', () => { win = null; });
 }
 
-// Surukleme bittikten sonra bekleyen boyutlandirmayi uygula
-// Istenen pencere boyutu — tasima ve boyutlandirma HEP birlikte (setBounds)
-// verilir; olcekli ekranlarda (%125 vb.) setPosition'in pencereyi sisirmesi
-// bilinen bir Electron hatasidir, bu yontem onu onler.
-let wantW = 248;
+// Boyutlandirma: tasima ve boyut HEP birlikte (setBounds) verilir; olcekli
+// ekranlarda (%125 vb.) setPosition'in pencereyi sisirmesi onlenir.
+let wantW = WIN_W;
 let wantH = 300;
 let dragUntil = 0;
 let pendingSize = null;
@@ -182,25 +219,24 @@ function applyResize(h, w) {
   win.setBounds({ x: b.x, y: b.y, width: wantW, height: wantH });
 }
 
-// "Windows ile baslat" ozelligi kaldirildi — eski kayit varsa temizle.
 function cleanupLoginItem() {
   try {
-    app.setLoginItemSettings({
-      openAtLogin: false,
-      path: process.execPath,
-      args: [path.resolve(__dirname)],
-    });
+    app.setLoginItemSettings({ openAtLogin: false, path: process.execPath, args: [path.resolve(__dirname)] });
   } catch { /* yoksay */ }
 }
 
-// Yerel ses (TTS) sunucusunu otomatik baslat — chatterbox-server/.venv kuruluysa.
-// Kurulu degilse sessizce atlanir; tarayici sesi calismaya devam eder.
+// ---- Yerel ses (TTS) sunucusu ----
 let ttsProc = null;
-function startTtsServer() {
+function ttsPaths() {
+  const base = path.join(__dirname, 'chatterbox-server');
   const py = process.platform === 'win32'
-    ? path.join(__dirname, 'chatterbox-server', '.venv', 'Scripts', 'python.exe')
-    : path.join(__dirname, 'chatterbox-server', '.venv', 'bin', 'python');
-  const script = path.join(__dirname, 'chatterbox-server', 'server.py');
+    ? path.join(base, '.venv', 'Scripts', 'python.exe')
+    : path.join(base, '.venv', 'bin', 'python');
+  return { base, py, script: path.join(base, 'server.py') };
+}
+
+function startTtsServer() {
+  const { py, script } = ttsPaths();
   if (!fs.existsSync(py) || !fs.existsSync(script)) { dlog('ses sunucusu: venv yok, atlandi'); return; }
   try {
     const { spawn } = require('child_process');
@@ -211,7 +247,41 @@ function startTtsServer() {
   } catch (e) { dlog('ses sunucusu baslatilamadi:', e.message); }
 }
 
-// Pano izleyici: "Kopyalayinca oku" acikken yeni kopyalanan metni okur.
+// Dogal ses kurulumu / guncellemesi (Ayarlar -> "Doğal sesleri kur").
+// Sonuc 'command' ile arayuze bildirilir.
+let voiceSetupRunning = false;
+function setupVoices() {
+  if (voiceSetupRunning) return;
+  voiceSetupRunning = true;
+  sendCommand('voices-setup', { status: 'running' });
+  const { spawn } = require('child_process');
+  const script = path.join(__dirname, 'scripts', 'setup-voices.js');
+  const child = spawn(process.execPath, [script], {
+    windowsHide: true,
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+    cwd: __dirname,
+  });
+  let out = '';
+  child.stdout.on('data', (d) => { out += d; });
+  child.stderr.on('data', (d) => { out += d; });
+  child.on('close', (code) => {
+    voiceSetupRunning = false;
+    dlog('ses kurulumu bitti:', code, out.slice(-400));
+    if (code === 0) {
+      try { if (ttsProc) ttsProc.kill(); } catch { /* */ }
+      setTimeout(startTtsServer, 500);
+      sendCommand('voices-setup', { status: 'ok' });
+    } else {
+      sendCommand('voices-setup', { status: 'error', log: out.slice(-600) });
+    }
+  });
+  child.on('error', (e) => {
+    voiceSetupRunning = false;
+    sendCommand('voices-setup', { status: 'error', log: e.message });
+  });
+}
+
+// ---- Pano izleyici: "Kopyalayinca oku" ----
 let lastClip = '';
 let clipTimer = null;
 function startClipboardWatch() {
@@ -222,7 +292,7 @@ function startClipboardWatch() {
     try { t = clipboard.readText() || ''; } catch { return; }
     if (t && t !== lastClip) {
       lastClip = t;
-      if (config.readOnCopy && !config.muted) manualRead(t);
+      if (config.readOnCopy && !config.muted) manualRead(t, 'Kopyalanan metin');
     }
   }, 500);
 }
@@ -233,21 +303,20 @@ function createTray() {
     const face = nativeImage.createFromPath(assetPath('face.png'));
     if (!face.isEmpty()) img = face.resize({ width: 18, height: 18 });
   } catch { /* yoksay */ }
-
   tray = new Tray(img);
   rebuildTrayMenu();
-  tray.setToolTip('Pofu — Claude yoldaşı');
+  tray.setToolTip('Pofu');
   tray.on('click', () => toggleWindow());
 }
 
 function rebuildTrayMenu() {
   if (!tray) return;
   const menu = Menu.buildFromTemplate([
-    { id: 'mute', label: 'Sustur (hicbir sey okuma)', type: 'checkbox', checked: !!config.muted,
-      click: (item) => setMuted(item.checked) },
+    { label: 'Sustur', type: 'checkbox', checked: !!config.muted, click: (item) => setMuted(item.checked) },
     { label: 'Oku / Duraklat', click: () => sendCommand('toggle') },
     { label: 'Durdur', click: () => sendCommand('stop') },
     { type: 'separator' },
+    { label: 'Panoyu oku', click: () => manualRead(clipboard.readText(), 'Pano') },
     { label: 'Goster / Gizle', click: () => toggleWindow() },
     { label: 'Cikis', click: () => { app.isQuiting = true; app.quit(); } },
   ]);
@@ -255,9 +324,9 @@ function rebuildTrayMenu() {
 }
 
 function setMuted(m) {
-  config.muted = !!m; // yalniz ses susar; metin bildirimi devam eder
+  config.muted = !!m;
   saveConfig();
-  if (win && !win.isDestroyed()) win.webContents.send('command', { action: m ? 'muted-on' : 'muted-off' });
+  sendCommand(m ? 'muted-on' : 'muted-off');
   rebuildTrayMenu();
 }
 
@@ -267,17 +336,16 @@ function toggleWindow() {
   else { win.show(); win.setAlwaysOnTop(true, 'screen-saver'); }
 }
 
-function sendCommand(action) {
-  if (win && !win.isDestroyed()) win.webContents.send('command', { action });
+function sendCommand(action, extra) {
+  if (win && !win.isDestroyed()) win.webContents.send('command', { action, ...(extra || {}) });
 }
 
-// Her oturum (transcript dosyasi) icin okunabilir bir etiket uret:
-// projenin klasor adi + ayni projede birden fazla oturum varsa numara.
+// ---- Oturum etiketleri ----
 const fileLabels = new Map();
 const projectSeq = new Map();
 function labelFor(file, cwd) {
   if (fileLabels.has(file)) return fileLabels.get(file);
-  if (!cwd) return ''; // cwd henuz bilinmiyorsa etiketi sabitleme
+  if (!cwd) return '';
   let name;
   try { name = path.basename(cwd) || cwd; } catch { name = cwd; }
   const n = (projectSeq.get(name) || 0) + 1;
@@ -287,8 +355,8 @@ function labelFor(file, cwd) {
   return label;
 }
 
-// ---- Oturum durumu (calisiyor / onay bekliyor / bitti) ----
-const sessions = new Map(); // file -> { id, label, cwd, status, title, ts, lastActivity }
+// ---- Oturum durumu ----
+const sessions = new Map();
 
 function touchSession(file, cwd) {
   let s = sessions.get(file);
@@ -307,10 +375,8 @@ function sendSessions() {
     id: s.id, label: s.label || '…', status: s.status, title: s.title || '', ts: s.ts,
   }));
   win.webContents.send('sessions', list);
-  dlog('sessions:', list.map((s) => `${s.label}=${s.status}`).join(', ') || '(bos)');
 }
 
-// 45 dk hareketsiz oturumlari listeden dusur
 setInterval(() => {
   const cutoff = Date.now() - 45 * 60 * 1000;
   let changed = false;
@@ -320,10 +386,8 @@ setInterval(() => {
   if (changed) sendSessions();
 }, 60 * 1000);
 
-// Debounce tamponu: Claude yanitini adim adim yazar (araclar arasinda). Her
-// parcada tetiklemek yerine, belli bir sure yeni metin gelmezse yanit "bitti"
-// sayilir ve TEK sefer okunur.
-const buffers = new Map(); // file -> { items: [{text, cwd, ts}], timer }
+// ---- Claude yanit tamponu ----
+const buffers = new Map();
 
 function clearBuffers() {
   for (const b of buffers.values()) { if (b.timer) clearTimeout(b.timer); }
@@ -331,7 +395,6 @@ function clearBuffers() {
 }
 
 function onAssistantText({ text, file, ts, cwd }) {
-  // Not: sustur (muted) yalniz SESI keser; metin bildirimi yine gelir.
   let b = buffers.get(file);
   if (!b) { b = { items: [], timer: null }; buffers.set(file, b); }
   b.items.push({ text, cwd, ts });
@@ -339,7 +402,6 @@ function onAssistantText({ text, file, ts, cwd }) {
   b.timer = setTimeout(() => flush(file), Math.max(500, config.settleMs || 2500));
 }
 
-// Yanit "onay bekliyor" mu yoksa "konusma sonlandi" mi?
 const APPROVAL_RE = /(onayl[ıia]|onay bekl|onaylıyor musun|devam edeyim mi|devam edeyim mı|başlayay[ıi]m m[ıi]|yapay[ıi]m m[ıi]|ister misin|olur mu|emin misin|should i\b|shall i\b|may i\b|proceed\??$|confirm\b|approve\b)/i;
 
 function classifyKind(scoped, lastSentence) {
@@ -350,10 +412,55 @@ function classifyKind(scoped, lastSentence) {
 
 function makeTitle(sentences) {
   const s = (sentences[0] || '').replace(/\s+/g, ' ').trim();
-  return s.length > 54 ? s.slice(0, 52).trim() + '…' : s;
+  return s.length > 60 ? s.slice(0, 58).trim() + '…' : s;
 }
 
-function flush(file) {
+// ---- Okuma paketi: dil algila + (istenirse) cevir ----
+// Donus: { src: {lang, sentences}, tr: {lang, sentences} | null, ... }
+const KNOWN = new Set(['tr', 'en', 'de', 'fr', 'es', 'it', 'pt', 'nl', 'pl', 'sv', 'ru', 'ja', 'ko', 'zh', 'ar', 'hi', 'el', 'he', 'th']);
+
+async function buildRead(plainText, meta) {
+  const text = String(plainText || '').trim();
+  const srcSentences = toSentences(text, { skipCode: config.skipCode });
+  if (!srcSentences.length) return null;
+
+  const fixed = config.autoMode ? 'auto' : (config.language || 'auto');
+  let srcLang = fixed !== 'auto' ? fixed : detect(text, lastLang);
+  const target = targetLang();
+  let tr = null;
+  let trError = '';
+
+  if (config.translate) {
+    sendCommand('busy', { text: 'Çevriliyor…' });
+    try {
+      const clean = stripMarkdown(text, { skipCode: config.skipCode });
+      const res = await translate(clean, target, srcLang);
+      if (res) {
+        if (fixed === 'auto' && res.srcLang && KNOWN.has(res.srcLang)) srcLang = res.srcLang;
+        if (res.srcLang !== target && res.text && res.text.trim() !== clean.trim()) {
+          const trSentences = toSentences(res.text, { skipCode: false });
+          if (trSentences.length) tr = { lang: target, sentences: trSentences };
+        }
+      }
+    } catch (e) {
+      trError = e.message;
+      dlog('ceviri hatasi:', e.message);
+    }
+    sendCommand('busy', { text: '' });
+  }
+  lastLang = srcLang;
+  return {
+    ...meta,
+    title: meta.title || makeTitle(srcSentences),
+    src: { lang: srcLang, sentences: srcSentences },
+    tr,
+    trError: trError ? 'Çeviri yapılamadı (internet?)' : '',
+    // Geriye uyumluluk
+    sentences: srcSentences, lang: srcLang,
+  };
+}
+
+async function flush(file) {
   const b = buffers.get(file);
   if (!b || !b.items.length) { if (b) b.timer = null; return; }
   const items = b.items;
@@ -362,22 +469,15 @@ function flush(file) {
 
   const scope = config.readScope || 'lastParagraph';
   const cwd = items[items.length - 1].cwd || '';
-  // 'all' -> tum parcalari birlestir; digerleri -> son parcadan kapsam al
-  const raw = scope === 'all'
-    ? items.map((i) => i.text).join('\n\n')
-    : items[items.length - 1].text;
+  const raw = scope === 'all' ? items.map((i) => i.text).join('\n\n') : items[items.length - 1].text;
   const scoped = scopedText(raw, scope, { skipCode: config.skipCode });
   const sentences = toSentences(scoped, { skipCode: config.skipCode });
   if (!sentences.length) return;
-
-  let lang = config.language;
-  if (!lang || lang === 'auto') { lang = detect(scoped, lastLang); lastLang = lang; }
 
   const last = sentences[sentences.length - 1].trim();
   const kind = classifyKind(scoped, last);
   const title = makeTitle(sentences);
 
-  // Oturum durumunu guncelle: yanit bitti -> done ya da approval
   const s = touchSession(file, cwd);
   s.status = kind;
   s.title = title;
@@ -386,9 +486,8 @@ function flush(file) {
   sendSessions();
 
   dlog('flush:', label, '| ' + kind, '| ' + sentences.length + ' cumle');
-  if (win && !win.isDestroyed()) {
-    win.webContents.send('read', { id: file, sentences, lang, label, kind, title, isQuestion: kind === 'approval' });
-  }
+  const payload = await buildRead(scoped, { id: file, label, kind, title, manual: false, isQuestion: kind === 'approval' });
+  if (payload && win && !win.isDestroyed()) win.webContents.send('read', payload);
 }
 
 function startWatcher() {
@@ -396,17 +495,14 @@ function startWatcher() {
   clearBuffers();
   sessions.clear();
   sendSessions();
-  // Saf ekran okuyucu modu: Claude takibi kapali — izleyici hic baslamaz
   if (!config.claudeMode) { dlog('claude modu kapali; izleyici yok'); return; }
   watcher = new TranscriptWatcher({
     projectFilter: config.projectFilter,
     onText: onAssistantText,
     onActivity: ({ file, cwd }) => {
-      // Dosya buyudu = o oturumda is donuyor (arac, dusunme, kullanici...).
       const s = touchSession(file, cwd);
       s.lastActivity = Date.now();
       if (!s.label) s.label = labelFor(file, s.cwd || cwd);
-      // Aktivite surdukce yanit "bitti" sayilmaz: bekleyen flush'i ertele.
       const b = buffers.get(file);
       if (b && b.timer && b.items.length) {
         clearTimeout(b.timer);
@@ -425,9 +521,7 @@ function startWatcher() {
   watcher.start();
 }
 
-// Oturumun VS Code penceresine odaklan (baslikta proje adini ara).
-// Baslikta proje adi yoksa (or. isimsiz calisma alani "Untitled (Workspace)")
-// herhangi bir VS Code penceresine odaklan.
+// ---- VS Code penceresine odaklan ----
 function focusWindows(needle, cb) {
   const script = path.join(__dirname, 'src', 'focus-window.ps1');
   const { execFile } = require('child_process');
@@ -458,36 +552,34 @@ function focusSession(id) {
   if (s.cwd) { try { needle = path.basename(s.cwd); } catch { needle = ''; } }
   if (!needle) needle = (s.label || '').replace(/ \d+$/, '');
   if (!needle) return;
-
   if (process.platform === 'darwin') { focusMac(needle); return; }
-
   focusWindows(needle, (r1) => {
     dlog('focus:', needle, r1);
-    if (r1 === 'notfound') {
-      // Proje adi baslikta yok -> en azindan VS Code'a git
-      focusWindows('Visual Studio Code', (r2) => dlog('focus fallback:', r2));
-    }
+    if (r1 === 'notfound') focusWindows('Visual Studio Code', (r2) => dlog('focus fallback:', r2));
   });
 }
 
-// Kullanicinin secip istedigi metni HEMEN okur (otomatik okuma/sustur'u yok sayar).
-// Kaynak: global kisayol -> pano, ya da surattaki yapistir-oku kutusu.
-function manualRead(rawText) {
-  const text = (rawText || '').trim();
+// ---- Manuel okuma (pano / kisayol / uzanti / kutu) ----
+const MAX_READ_CHARS = 20000;
+let lastManual = { text: '', ts: 0 };
+
+async function manualRead(rawText, label) {
+  let text = String(rawText || '').trim();
   if (!text) return;
-  const sentences = toSentences(text, { skipCode: config.skipCode });
-  if (!sentences.length) return;
-  let lang = config.language;
-  if (!lang || lang === 'auto') { lang = detect(text, lastLang); lastLang = lang; }
-  const title = makeTitle(sentences);
-  dlog('manuel oku:', sentences.length, 'cumle, lang=' + lang);
+  if (text.length > MAX_READ_CHARS) text = text.slice(0, MAX_READ_CHARS);
+  // Ayni metin pes pese iki kaynaktan gelirse (pano + kisayol) tek sefer oku
+  if (text === lastManual.text && Date.now() - lastManual.ts < 2500) return;
+  lastManual = { text, ts: Date.now() };
+
+  const payload = await buildRead(text, { label: label || 'Seçili metin', manual: true, kind: 'manual', isQuestion: false });
+  if (!payload) return;
+  dlog('manuel oku:', payload.src.sentences.length, 'cumle, lang=' + payload.src.lang, payload.tr ? '-> ' + payload.tr.lang : '');
   if (win && !win.isDestroyed()) {
     if (!win.isVisible()) win.show();
-    win.webContents.send('read', { sentences, lang, label: 'Seçili metin', title, isQuestion: false, manual: true });
+    win.webContents.send('read', payload);
   }
 }
 
-// Panodaki metni Gorevler panosuna at (OKUMAZ — kullanici ▶ ile okutur)
 function addNoteFromClipboard() {
   let t = '';
   try { t = (clipboard.readText() || '').trim(); } catch { t = ''; }
@@ -506,7 +598,7 @@ function registerHotkey() {
   hotkeyOk = false;
   noteHotkeyOk = false;
   if (acc) {
-    try { hotkeyOk = globalShortcut.register(acc, () => manualRead(clipboard.readText())); }
+    try { hotkeyOk = globalShortcut.register(acc, () => manualRead(clipboard.readText(), 'Pano')); }
     catch { hotkeyOk = false; }
   }
   if (nAcc) {
@@ -514,17 +606,11 @@ function registerHotkey() {
     catch { noteHotkeyOk = false; }
   }
   dlog('kisayol', acc, hotkeyOk ? 'ok' : 'KAYIT EDILEMEDI', '| not:', nAcc, noteHotkeyOk ? 'ok' : 'KAYIT EDILEMEDI');
-  if (win && !win.isDestroyed()) {
-    win.webContents.send('command', {
-      action: 'hotkey', ok: hotkeyOk, hotkey: acc,
-      noteOk: noteHotkeyOk, noteHotkey: nAcc,
-    });
-  }
+  sendCommand('hotkey', { ok: hotkeyOk, hotkey: acc, noteOk: noteHotkeyOk, noteHotkey: nAcc });
   return hotkeyOk;
 }
 
-// Yerel API: tarayici uzantisi (sag tik -> Oku) secili metni buraya POST eder.
-// Yalniz 127.0.0.1 dinler; disari kapali.
+// ---- Yerel API (tarayici uzantisi) ----
 let apiServer = null;
 function startApiServer() {
   const port = config.httpPort || 7889;
@@ -545,7 +631,7 @@ function startApiServer() {
         req.on('end', () => {
           let text = '';
           try { text = (JSON.parse(body || '{}').text) || ''; } catch { text = ''; }
-          manualRead(text);
+          manualRead(text, 'Sayfadan');
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end('{"ok":true}');
         });
@@ -558,61 +644,71 @@ function startApiServer() {
   } catch (e) { dlog('api server baslatilamadi:', e.message); }
 }
 
+// Gelistirici: OKUR_DEMO=1 -> ornek icerik (tasarim kontrolu icin)
+function runDemo() {
+  const demo = 'Pofu reads any text you copy. It detects the language, translates it into yours and reads it aloud with a natural voice. Should I continue with the next step?';
+  setTimeout(() => manualRead(demo, 'Kopyalanan metin'), 800);
+  if (process.env.OKUR_DEMO_TAB) setTimeout(() => sendCommand('tab', { tab: process.env.OKUR_DEMO_TAB }), 5000);
+  if (config.claudeMode) {
+    setTimeout(() => {
+      const mk = (id, label, status, title) => sessions.set(id, { id, label, cwd: '', status, title, ts: Date.now(), lastActivity: Date.now() });
+      mk('a', 'para-app', 'approval', 'Veritabanı şemasını değiştireyim mi?');
+      mk('b', 'pofu', 'working', '');
+      mk('c', 'web-site', 'done', 'Testler geçti, derleme hazır.');
+      sendSessions();
+    }, 1200);
+  }
+}
+
 // ---- IPC ----
 ipcMain.on('renderer-ready', (e) => {
-  e.sender.send('config', config);
-  e.sender.send('command', {
-    action: 'hotkey', ok: hotkeyOk, hotkey: config.hotkey,
-    noteOk: noteHotkeyOk, noteHotkey: config.noteHotkey,
-  });
+  e.sender.send('config', publicConfig());
+  e.sender.send('command', { action: 'hotkey', ok: hotkeyOk, hotkey: config.hotkey, noteOk: noteHotkeyOk, noteHotkey: config.noteHotkey });
   startWatcher();
   sendSessions();
+  if (process.env.OKUR_DEMO) runDemo();
 });
 
-// Oturum satirina tiklandi -> o VS Code penceresine git
 ipcMain.on('focus-session', (_e, payload) => {
   if (payload && payload.id) focusSession(payload.id);
 });
 
-// Maskottan tutup tasima (renderer elle surukler).
-// setBounds (konum+boyut birlikte): DPI olcekli ekranlarda buyume hatasini onler.
 ipcMain.handle('win-pos', () => (win && !win.isDestroyed()) ? win.getPosition() : [0, 0]);
 ipcMain.on('win-move', (_e, p) => {
   if (!win || win.isDestroyed() || !p) return;
-  dragUntil = Date.now() + 700; // tasima sirasinda resize erteleme
+  dragUntil = Date.now() + 700;
   win.setBounds({ x: Math.round(p.x), y: Math.round(p.y), width: wantW, height: wantH });
 });
 
-// Icerik boyutu degisti -> pencereyi icerige gore boyutla
-// (surukleme sirasinda applyResize erteler — donma yok)
 ipcMain.on('resize', (_e, payload) => {
   if (!payload) return;
-  const h = Math.max(70, Math.min(700, Math.round(payload.height || 0)));
-  const w = payload.width ? Math.max(70, Math.min(400, Math.round(payload.width))) : null;
+  const h = Math.max(70, Math.min(760, Math.round(payload.height || 0)));
+  const w = payload.width ? Math.max(MINI_W, Math.min(420, Math.round(payload.width))) : null;
   applyResize(h, w);
 });
 
-ipcMain.on('state', () => { /* ileride tray ipucu guncellenebilir */ });
+ipcMain.on('state', () => { /* tepsi ipucu icin yer */ });
 
 ipcMain.on('save-config', (_e, partial) => {
-  const filterChanged = partial && (
-    ('projectFilter' in partial && partial.projectFilter !== config.projectFilter) ||
-    ('claudeMode' in partial && partial.claudeMode !== config.claudeMode));
-  const mutedChanged = partial && 'muted' in partial && partial.muted !== config.muted;
-  const hotkeyChanged = partial && (
-    ('hotkey' in partial && partial.hotkey !== config.hotkey) ||
-    ('noteHotkey' in partial && partial.noteHotkey !== config.noteHotkey));
+  if (!partial || typeof partial !== 'object') return;
+  const filterChanged = ('projectFilter' in partial && partial.projectFilter !== config.projectFilter)
+    || ('claudeMode' in partial && partial.claudeMode !== config.claudeMode);
+  const mutedChanged = 'muted' in partial && partial.muted !== config.muted;
+  const hotkeyChanged = ('hotkey' in partial && partial.hotkey !== config.hotkey)
+    || ('noteHotkey' in partial && partial.noteHotkey !== config.noteHotkey);
+  const targetChanged = 'targetLang' in partial && partial.targetLang !== config.targetLang;
   config = { ...config, ...partial };
+  if (config.autoMode) { config.engine = 'auto'; config.language = 'auto'; }
   saveConfig();
   if (mutedChanged) rebuildTrayMenu();
   if (filterChanged) startWatcher();
   if (hotkeyChanged) registerHotkey();
+  if (targetChanged && win && !win.isDestroyed()) win.webContents.send('config', publicConfig());
 });
 
-// Manuel okuma: surattaki kutudan gelen metin ya da pano.
-ipcMain.on('read-text', (_e, payload) => manualRead(payload && payload.text));
-ipcMain.on('read-clipboard', () => manualRead(clipboard.readText()));
-
+ipcMain.on('read-text', (_e, payload) => manualRead(payload && payload.text, 'Yazılan metin'));
+ipcMain.on('read-clipboard', () => manualRead(clipboard.readText(), 'Pano'));
+ipcMain.on('setup-voices', () => setupVoices());
 ipcMain.on('quit', () => { app.isQuiting = true; app.quit(); });
 
 // ---- Yasam dongusu ----
@@ -642,8 +738,7 @@ if (!gotLock) {
     try { if (ttsProc) ttsProc.kill(); } catch { /* */ }
   });
 
-  // Pencere gizlense de tepside calismaya devam etsin.
-  app.on('window-all-closed', () => { /* cikma; tepsiden yonetiliyor */ });
+  app.on('window-all-closed', () => { /* tepsiden yonetiliyor */ });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

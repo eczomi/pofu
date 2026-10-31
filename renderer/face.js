@@ -2,130 +2,206 @@
 
 // ---- Durum ----
 let cfg = {
-  engine: 'auto',
-  chatterboxUrl: 'http://127.0.0.1:7888',
-  rate: 1.0,
-  language: 'auto',
-  voiceName: '',
-  skipCode: true,
-  claudeMode: true,
-  autoRead: false,
-  readScope: 'lastParagraph',
-  cueFlash: true,
-  muted: false,
-  projectFilter: '',
-  hotkey: 'CommandOrControl+Alt+S',
-  noteHotkey: 'CommandOrControl+Alt+Q',
-  notes: [],
-  readOnCopy: true,
+  autoMode: true, translate: true, targetLang: '', targetLangResolved: 'tr',
+  readWhat: 'translation', voiceGender: 'female',
+  engine: 'auto', chatterboxUrl: 'http://127.0.0.1:7888', rate: 1.0, language: 'auto',
+  voiceByLang: {}, skipCode: true, claudeMode: true, autoRead: false, readScope: 'lastParagraph',
+  cueFlash: true, muted: false, projectFilter: '', hotkey: 'CommandOrControl+Alt+S',
+  noteHotkey: 'CommandOrControl+Alt+Q', notes: [], readOnCopy: true, miniMode: false,
 };
 
-let sentences = [];      // { text, lang, el }
-let idx = -1;            // su an okunan cumle (yoksa -1)
+let sentences = [];      // seslendirilecek cumleler: { text, lang, el, label }
+let idx = -1;            // su an okunan cumle
 let state = 'idle';      // 'idle' | 'playing' | 'paused'
-let engine = 'browser';  // fiili motor
-let chatterboxOk = false;
-let voices = [];
+let engine = 'browser';  // fiili motor: 'browser' | 'chatterbox' (= yerel ses sunucusu)
+let serverOk = false;
+let serverEngine = '';   // sunucunun motoru: 'edge' | 'chatterbox'
+let serverError = '';
+let voices = [];         // Windows / tarayici sesleri
+let serverVoices = [];   // sunucunun dogal sesleri
 let stopped = false;
 let cueTimer = null;
-let gen = 0; // konusma nesli — eski onend'lerin yanlislikla ilerletmesini onler
+let gen = 0;             // konusma nesli: eski onend'ler ilerletmesin
+let lastPayload = null;  // son okuma paketi (seslendirme tercihi degisince yeniden okumak icin)
+let activeTab = 'read';
+let busyText = '';
 const audio = new Audio();
 
-// Algilanan dile gore bildirim kelimesi
+const LANGS = [
+  ['tr', 'Türkçe'], ['en', 'İngilizce'], ['de', 'Almanca'], ['fr', 'Fransızca'],
+  ['es', 'İspanyolca'], ['it', 'İtalyanca'], ['pt', 'Portekizce'], ['nl', 'Felemenkçe'],
+  ['pl', 'Lehçe'], ['sv', 'İsveççe'], ['ru', 'Rusça'], ['ja', 'Japonca'], ['ko', 'Korece'],
+  ['zh', 'Çince'], ['ar', 'Arapça'], ['hi', 'Hintçe'], ['el', 'Yunanca'], ['he', 'İbranice'], ['th', 'Tayca'],
+];
+const LANG_NAME = Object.fromEntries(LANGS);
+const langName = (c) => LANG_NAME[c] || String(c || '').toUpperCase();
+
+// Dil basina onerilen dogal sesler (kadin, erkek). Sunucu listesinde yoksa
+// ayni dilden ilk uygun ses secilir.
+const SERVER_DEFAULTS = {
+  tr: ['tr-TR-EmelNeural', 'tr-TR-AhmetNeural'], en: ['en-US-AriaNeural', 'en-US-GuyNeural'],
+  de: ['de-DE-KatjaNeural', 'de-DE-ConradNeural'], fr: ['fr-FR-DeniseNeural', 'fr-FR-HenriNeural'],
+  es: ['es-ES-ElviraNeural', 'es-ES-AlvaroNeural'], it: ['it-IT-ElsaNeural', 'it-IT-DiegoNeural'],
+  pt: ['pt-BR-FranciscaNeural', 'pt-BR-AntonioNeural'], nl: ['nl-NL-ColetteNeural', 'nl-NL-MaartenNeural'],
+  pl: ['pl-PL-ZofiaNeural', 'pl-PL-MarekNeural'], sv: ['sv-SE-SofieNeural', 'sv-SE-MattiasNeural'],
+  ru: ['ru-RU-SvetlanaNeural', 'ru-RU-DmitryNeural'], ja: ['ja-JP-NanamiNeural', 'ja-JP-KeitaNeural'],
+  ko: ['ko-KR-SunHiNeural', 'ko-KR-InJoonNeural'], zh: ['zh-CN-XiaoxiaoNeural', 'zh-CN-YunxiNeural'],
+  ar: ['ar-SA-ZariyahNeural', 'ar-SA-HamedNeural'], hi: ['hi-IN-SwaraNeural', 'hi-IN-MadhurNeural'],
+  el: ['el-GR-AthinaNeural', 'el-GR-NestorasNeural'], he: ['he-IL-HilaNeural', 'he-IL-AvriNeural'],
+  th: ['th-TH-PremwadeeNeural', 'th-TH-NiwatNeural'],
+};
+// Windows ses adlarindan cinsiyet tahmini
+const FEMALE_RE = /zira|hazel|susan|heera|hoda|hedda|helena|elsa|laura|paulina|irina|haruka|ayumi|heami|huihui|yaoyao|tracy|catherine|linda|sabina|hortense|julie|hanna|caroline|kalpana|maria|emel|seda|filiz|female|kadın/i;
+const MALE_RE = /david|mark|george|james|richard|ravi|stefan|hemant|ichiro|kangkang|tolga|pablo|raul|cosimo|paul|frank|bart|adam|pavel|ivan|andika|male|erkek/i;
+
 const CUE_WORDS = {
-  done: { en: 'Done', tr: 'Bitti', de: 'Fertig', fr: 'Termine', es: 'Listo', it: 'Fatto', pt: 'Pronto', nl: 'Klaar', pl: 'Gotowe', sv: 'Klart', ru: 'Gotovo', ja: 'Kanryo', ko: 'Wanryo', zh: 'Wancheng', ar: 'Tamma', hi: 'Ho gaya', el: 'Etoimo', he: 'Siyum', th: 'Set' },
-  question: { en: 'Question', tr: 'Soru', de: 'Frage', fr: 'Question', es: 'Pregunta', it: 'Domanda', pt: 'Pergunta', nl: 'Vraag', pl: 'Pytanie', sv: 'Fraga', ru: 'Vopros', ja: 'Shitsumon', ko: 'Jilmun', zh: 'Wenti', ar: 'Sual', hi: 'Sawaal', el: 'Erotisi', he: 'Sheela', th: 'Kamtham' },
+  done: { en: 'Done', tr: 'Bitti', de: 'Fertig', fr: 'Terminé', es: 'Listo', it: 'Fatto', pt: 'Pronto', nl: 'Klaar', pl: 'Gotowe', sv: 'Klart', ru: 'Готово', ja: '完了', ko: '완료', zh: '完成', ar: 'تم', hi: 'हो गया', el: 'Έτοιμο', he: 'סיום', th: 'เสร็จ' },
+  question: { en: 'Question', tr: 'Soru', de: 'Frage', fr: 'Question', es: 'Pregunta', it: 'Domanda', pt: 'Pergunta', nl: 'Vraag', pl: 'Pytanie', sv: 'Fråga', ru: 'Вопрос', ja: '質問', ko: '질문', zh: '问题', ar: 'سؤال', hi: 'सवाल', el: 'Ερώτηση', he: 'שאלה', th: 'คำถาม' },
 };
 
-const LANGS = [
-  ['auto', 'Otomatik'], ['tr', 'Turkce'], ['en', 'English'], ['de', 'Deutsch'],
-  ['fr', 'Francais'], ['es', 'Espanol'], ['it', 'Italiano'], ['pt', 'Portugues'],
-  ['nl', 'Nederlands'], ['pl', 'Polski'], ['sv', 'Svenska'], ['ru', 'Russian'],
-  ['ja', 'Japanese'], ['ko', 'Korean'], ['zh', 'Chinese'], ['ar', 'Arabic'],
-  ['hi', 'Hindi'], ['el', 'Greek'], ['he', 'Hebrew'], ['th', 'Thai'],
-];
-
 const $ = (s) => document.querySelector(s);
+const LISTEN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>';
+const CLOSE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
 
 // ---- Sesler ----
 function refreshVoices() {
   voices = window.speechSynthesis ? speechSynthesis.getVoices() : [];
   populateVoiceSelect();
 }
-if (window.speechSynthesis) {
-  speechSynthesis.onvoiceschanged = refreshVoices;
+if (window.speechSynthesis) speechSynthesis.onvoiceschanged = refreshVoices;
+
+const lang2 = (s) => String(s || '').toLowerCase().split(/[-_]/)[0];
+const wantMale = () => cfg.voiceGender === 'male';
+
+// Kullanicinin bu dil icin sabitledigi ses (yalniz gelismis modda)
+function userVoiceFor(lang) {
+  if (cfg.autoMode) return '';
+  return (cfg.voiceByLang && cfg.voiceByLang[lang]) || '';
 }
 
-function pickVoice(langCode) {
-  if (!voices.length) voices = speechSynthesis.getVoices();
-  const lc = (langCode || 'en').toLowerCase();
-  // Kullanicinin sabitledigi ses (yalniz dil otomatik degilse anlamli)
-  if (cfg.voiceName) {
-    const chosen = voices.find((v) => v.name === cfg.voiceName);
-    if (chosen && (cfg.language !== 'auto' || chosen.lang.toLowerCase().startsWith(lc))) return chosen;
-  }
-  let v = voices.find((x) => x.lang && x.lang.toLowerCase().startsWith(lc + '-'));
-  if (!v) v = voices.find((x) => x.lang && x.lang.toLowerCase().startsWith(lc));
-  if (!v && lc === 'en') v = voices.find((x) => /^en/i.test(x.lang));
-  return v || null;
+function serverVoiceFor(lang) {
+  const lc = lang2(lang) || 'en';
+  const u = userVoiceFor(lc);
+  if (u && isServerVoice(u)) return u;
+  const def = (SERVER_DEFAULTS[lc] || SERVER_DEFAULTS.en)[wantMale() ? 1 : 0];
+  if (!serverVoices.length || isServerVoice(def)) return def;
+  const same = serverVoices.filter((v) => lang2(v.lang) === lc);
+  const g = wantMale() ? 'male' : 'female';
+  const byGender = same.find((v) => String(v.gender).toLowerCase() === g);
+  return (byGender || same[0] || { name: '' }).name;
 }
+
+function browserVoiceFor(lang) {
+  if (!voices.length) voices = speechSynthesis.getVoices();
+  const lc = lang2(lang) || 'en';
+  const u = userVoiceFor(lc);
+  if (u) { const v = voices.find((x) => x.name === u); if (v) return v; }
+  const same = voices.filter((v) => lang2(v.lang) === lc);
+  if (!same.length) return null;
+  const re = wantMale() ? MALE_RE : FEMALE_RE;
+  return same.find((v) => re.test(v.name)) || same[0];
+}
+
+function isServerVoice(name) { return !!name && serverVoices.some((v) => v.name === name); }
 
 // ---- Motor tespiti ----
-let serverVoices = []; // ses sunucusunun dogal sesleri (edge)
 let detectTries = 0;
+let detectTimer = null;
 
 async function detectEngine() {
-  chatterboxOk = false;
+  clearTimeout(detectTimer);
+  let ok = false;
   if (cfg.engine !== 'browser') {
     try {
       const c = new AbortController();
       const t = setTimeout(() => c.abort(), 900);
-      const url = cfg.chatterboxUrl.replace(/\/$/, '') + '/health';
-      const r = await fetch(url, { signal: c.signal });
+      const r = await fetch(cfg.chatterboxUrl.replace(/\/$/, '') + '/health', { signal: c.signal });
       clearTimeout(t);
-      chatterboxOk = r.ok;
-    } catch { chatterboxOk = false; }
+      ok = r.ok;
+      if (ok) {
+        try { const j = await r.json(); serverEngine = j.engine || ''; serverError = j.error || ''; } catch { /* */ }
+      }
+    } catch { ok = false; }
   }
-  if (cfg.engine === 'chatterbox') engine = 'chatterbox';
+  serverOk = ok;
+  if (cfg.engine === 'chatterbox') engine = ok ? 'chatterbox' : 'browser';
   else if (cfg.engine === 'browser') engine = 'browser';
-  else engine = chatterboxOk ? 'chatterbox' : 'browser';
+  else engine = ok ? 'chatterbox' : 'browser';
   updateStatus();
+  if (ok && !serverVoices.length) loadServerVoices();
 
-  if (chatterboxOk && !serverVoices.length) loadServerVoices();
-
-  // Sunucu Pofu'yla birlikte aciliyor; ilk denemede hazir olmayabilir — tekrar dene.
-  if (!chatterboxOk && cfg.engine !== 'browser' && detectTries < 4) {
+  // Sunucu Pofu'yla birlikte aciliyor; hazir olana kadar tekrar dene, sonra seyrek kontrol et.
+  if (!ok && cfg.engine !== 'browser') {
     detectTries++;
-    setTimeout(detectEngine, 2500);
+    detectTimer = setTimeout(detectEngine, detectTries < 8 ? 2000 : 20000);
+  } else if (ok) {
+    detectTries = 0;
+    detectTimer = setTimeout(detectEngine, 30000);
   }
 }
 
 async function loadServerVoices() {
   try {
-    const url = cfg.chatterboxUrl.replace(/\/$/, '') + '/voices';
-    const r = await fetch(url);
+    const r = await fetch(cfg.chatterboxUrl.replace(/\/$/, '') + '/voices');
     if (!r.ok) return;
     const all = await r.json();
     const known = new Set(LANGS.map((l) => l[0]));
-    serverVoices = (all || []).filter((v) => known.has(String(v.lang || '').slice(0, 2)));
+    serverVoices = (all || []).filter((v) => known.has(lang2(v.lang)));
     populateVoiceSelect();
+    updateStatus();
   } catch { /* sunucu yok */ }
 }
 
-function isServerVoice(name) {
-  return !!name && serverVoices.some((v) => v.name === name);
+// ---- Konusma ----
+const audioCache = new Map(); // key -> Promise<Blob>
+function cacheKey(text, lang) {
+  return [text, lang, serverVoiceFor(lang), cfg.voiceGender, cfg.rate].join('|');
 }
 
-// ---- Konusma ----
+function fetchServerAudio(text, lang) {
+  const key = cacheKey(text, lang);
+  if (audioCache.has(key)) return audioCache.get(key);
+  const p = (async () => {
+    const r = await fetch(cfg.chatterboxUrl.replace(/\/$/, '') + '/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text,
+        language: lang2(lang) || 'en',
+        voice: serverVoiceFor(lang),
+        gender: cfg.voiceGender,
+        rate: cfg.rate || 1,
+      }),
+    });
+    if (!r.ok) {
+      let msg = 'tts ' + r.status;
+      try { msg = (await r.json()).error || msg; } catch { /* */ }
+      throw new Error(msg);
+    }
+    return r.blob();
+  })();
+  p.catch(() => audioCache.delete(key));
+  audioCache.set(key, p);
+  if (audioCache.size > 16) audioCache.delete(audioCache.keys().next().value);
+  return p;
+}
+
+// Siradaki cumleyi onceden hazirla: cumleler arasi bosluk kalmasin.
+function prefetch(i) {
+  const s = sentences[i];
+  if (!s || engine !== 'chatterbox') return;
+  fetchServerAudio(s.text, s.lang).catch(() => {});
+}
+
 function speak(text, lang, onend) {
-  if (engine === 'chatterbox') return speakChatterbox(text, lang, onend);
+  if (engine === 'chatterbox') return speakServer(text, lang, onend);
   return speakBrowser(text, lang, onend);
 }
 
 function speakBrowser(text, lang, onend) {
-  try { speechSynthesis.cancel(); } catch { /* yoksay */ }
+  try { speechSynthesis.cancel(); } catch { /* */ }
   const u = new SpeechSynthesisUtterance(text);
-  const v = pickVoice(lang);
+  const v = browserVoiceFor(lang);
   u.lang = v ? v.lang : (lang || 'en');
   if (v) u.voice = v;
   u.rate = cfg.rate || 1;
@@ -134,57 +210,48 @@ function speakBrowser(text, lang, onend) {
   speechSynthesis.speak(u);
 }
 
-async function speakChatterbox(text, lang, onend) {
+async function speakServer(text, lang, onend) {
+  const myGen = gen;
   try {
-    const url = cfg.chatterboxUrl.replace(/\/$/, '') + '/tts';
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text,
-        language: (lang || 'en').slice(0, 2),
-        voice: isServerVoice(cfg.voiceName) ? cfg.voiceName : '',
-      }),
-    });
-    if (!r.ok) throw new Error('tts ' + r.status);
-    const blob = await r.blob();
+    const blob = await fetchServerAudio(text, lang);
+    if (myGen !== gen) return; // bu arada durduruldu / atlandi
     if (audio.src) URL.revokeObjectURL(audio.src);
     audio.src = URL.createObjectURL(blob);
-    audio.playbackRate = cfg.rate || 1;
+    // edge: hiz sunucuda uygulanir; chatterbox: oynatma hiziyla
+    audio.playbackRate = serverEngine === 'edge' ? 1 : (cfg.rate || 1);
     audio.onended = () => onend && onend();
     audio.onerror = () => onend && onend();
     await audio.play();
-  } catch {
-    // Bu cumle icin tarayici sesine dus
-    engine = 'browser';
+    serverError = '';
+  } catch (e) {
+    if (myGen !== gen) return;
+    serverError = (e && e.message) || 'ses sunucusu hatasi';
     updateStatus();
-    speakBrowser(text, lang, onend);
+    speakBrowser(text, lang, onend); // bu cumle icin Windows sesine dus
   }
 }
 
 // ---- Oynatma dongusu ----
-function clearNowReading() { const nr = $('#nowReading'); if (nr) nr.textContent = ''; }
-
 function playFrom(i) {
   idx = i;
-  if (idx >= sentences.length) { setState('idle'); setFace(false); clearNowReading(); return; }
+  if (idx >= sentences.length) { setState('idle'); setFace(false); updateStatus(); return; }
   highlight(idx);
   const myGen = ++gen;
   const s = sentences[idx];
+  updateStatus();
   speak(s.text, s.lang, () => {
     if (myGen !== gen || stopped || state !== 'playing') return;
     playFrom(idx + 1);
   });
+  prefetch(idx + 1);
 }
 
-// Su anki konusmayi durdurur (durumu sifirlamadan) — atlama/manuel okuma icin.
 function cancelCurrent() {
-  gen++; // bekleyen onend'leri gecersiz kil
-  if (engine === 'browser') { try { speechSynthesis.cancel(); } catch { /* */ } }
-  else { try { audio.pause(); audio.currentTime = 0; } catch { /* */ } }
+  gen++;
+  try { speechSynthesis.cancel(); } catch { /* */ }
+  try { audio.pause(); audio.currentTime = 0; } catch { /* */ }
 }
 
-// Belirli bir cumleye atla ve oradan oku (tiklayinca) — uzerinde lighter yanar.
 function jumpTo(i) {
   if (i < 0 || i >= sentences.length) return;
   cancelCurrent();
@@ -200,7 +267,11 @@ function indexOfEl(el) {
 }
 
 function startNext() {
-  if (idx + 1 >= sentences.length) return;
+  if (idx + 1 >= sentences.length) {
+    // Her sey okunduysa bastan oku
+    if (sentences.length) jumpTo(0);
+    return;
+  }
   stopped = false;
   setState('playing');
   setFace(true);
@@ -212,34 +283,35 @@ function pause() {
   setFace(false);
   if (engine === 'browser') { try { speechSynthesis.pause(); } catch { /* */ } }
   else { try { audio.pause(); } catch { /* */ } }
+  updateStatus();
 }
 
 function resume() {
   setState('playing');
   setFace(true);
-  if (engine === 'browser') {
-    try { speechSynthesis.resume(); } catch { /* */ }
-  } else {
-    audio.play().catch(() => {});
-  }
+  if (engine === 'browser') { try { speechSynthesis.resume(); } catch { /* */ } }
+  else { audio.play().catch(() => {}); }
+  updateStatus();
 }
 
-// ■ = okuma gorevini IPTAL: ses durur, kuyruk ve altyazi temizlenir.
-function stopAll() {
+// Durdur: ses kesilir, kuyruk ve liste temizlenir.
+function stopAll(keepList) {
   stopped = true;
-  gen++; // bekleyen onend'leri gecersiz kil
+  gen++;
   setState('idle');
   setFace(false);
-  clearNowReading();
-  if (engine === 'browser') { try { speechSynthesis.cancel(); } catch { /* */ } }
-  else { try { audio.pause(); audio.currentTime = 0; } catch { /* */ } }
-  // Kuyrugu bosalt
-  sentences = [];
-  idx = -1;
-  const lines = $('#lines');
-  if (lines) lines.innerHTML = '';
-  const cap = $('#caption');
-  if (cap) cap.classList.add('hidden');
+  try { speechSynthesis.cancel(); } catch { /* */ }
+  try { audio.pause(); audio.currentTime = 0; } catch { /* */ }
+  if (!keepList) {
+    sentences = [];
+    idx = -1;
+    $('#lines').innerHTML = '';
+    updateReadEmpty();
+  } else {
+    for (const s of sentences) s.el.classList.remove('lit');
+    idx = -1;
+  }
+  updateStatus();
   requestResize();
 }
 
@@ -249,47 +321,105 @@ function toggle() {
   else startNext();
 }
 
-// ---- Altyazi / lighter ----
-// Her cevap bir "blok"tur; blok basinda hangi oturumdan geldigi yazar.
-function addSentences(list, lang, label) {
+// ---- Okuma paneli ----
+function voicedParts(p) {
+  const rw = cfg.translate ? (cfg.readWhat || 'translation') : 'original';
+  if (!p.tr || rw === 'original') return [{ key: 'src', ...p.src }];
+  if (rw === 'both') return [{ key: 'src', ...p.src }, { key: 'tr', ...p.tr }];
+  return [{ key: 'tr', ...p.tr }];
+}
+
+function mkChip(text, cls) {
+  const c = document.createElement('span');
+  c.className = 'chip ' + (cls || '');
+  c.textContent = text;
+  return c;
+}
+
+// Bir okuma paketini listeye ekler; seslendirilecek cumleleri kuyruga koyar.
+function addBlock(p) {
   const linesEl = $('#lines');
   const block = document.createElement('div');
   block.className = 'block';
-  if (label) {
-    const h = document.createElement('div');
-    h.className = 'block-label';
-    h.textContent = label;
-    block.appendChild(h);
-  }
-  for (const text of list) {
+
+  const head = document.createElement('div');
+  head.className = 'block-head';
+  const lbl = document.createElement('span');
+  lbl.className = 'block-label';
+  lbl.textContent = p.label || 'Metin';
+  head.appendChild(lbl);
+  head.appendChild(mkChip(p.tr ? `${langName(p.src.lang)} → ${langName(p.tr.lang)}` : langName(p.src.lang), 'lang'));
+  if (p.trError) head.appendChild(mkChip(p.trError, 'err'));
+  block.appendChild(head);
+
+  const voiced = voicedParts(p);
+  const voicedKeys = new Set(voiced.map((v) => v.key));
+  const parts = [];
+  // Seslendirilen parca ustte, digeri (varsa) altta soluk
+  const order = voicedKeys.has('tr') && !voicedKeys.has('src') ? ['tr', 'src'] : ['src', 'tr'];
+  for (const key of order) {
+    const part = key === 'src' ? p.src : p.tr;
+    if (!part) continue;
     const el = document.createElement('div');
-    el.className = 'line';
-    el.textContent = text;
-    el.title = 'Buradan oku';
-    el.addEventListener('click', () => jumpTo(indexOfEl(el)));
+    const isVoiced = voicedKeys.has(key);
+    el.className = 'part ' + (isVoiced ? 'primary' : 'secondary collapsed');
+    if (p.tr) {
+      const ph = document.createElement('div');
+      ph.className = 'part-head';
+      ph.textContent = key === 'tr' ? 'Çeviri · ' + langName(part.lang) : 'Orijinal · ' + langName(part.lang);
+      if (!isVoiced) ph.addEventListener('click', () => { el.classList.toggle('collapsed'); requestResize(); });
+      el.appendChild(ph);
+    }
+    if (isVoiced) {
+      for (const text of part.sentences) {
+        const line = document.createElement('div');
+        line.className = 'line';
+        line.textContent = text;
+        line.title = 'Buradan oku';
+        line.addEventListener('click', () => jumpTo(indexOfEl(line)));
+        el.appendChild(line);
+        parts.push({ text, lang: part.lang, el: line, label: p.label || '' });
+      }
+    } else {
+      const pl = document.createElement('p');
+      pl.className = 'plain';
+      pl.textContent = part.sentences.join(' ');
+      el.appendChild(pl);
+    }
     block.appendChild(el);
-    sentences.push({ text, lang, label: label || '', el });
   }
+  // Seslendirme sirasi: voiced listesi sirasiyla (both: once orijinal sonra ceviri)
+  const ordered = [];
+  for (const v of voiced) for (const s of parts) if (s.lang === v.lang && !ordered.includes(s) && v.sentences.includes(s.text)) ordered.push(s);
+  for (const s of ordered) sentences.push(s);
+
   linesEl.appendChild(block);
-  $('#caption').classList.remove('hidden');
-  trimCaption();
+  updateReadEmpty();
+  trimList();
 }
 
-function trimCaption() {
-  // Cok uzamasin: en fazla 120 cumle tut.
-  const MAX = 120;
+function trimList() {
+  const MAX = 160;
   while (sentences.length > MAX && idx > 10) {
     const s = sentences.shift();
     const el = s.el;
-    const block = el && el.parentNode;
-    if (el && block) {
-      block.removeChild(el);
-      if (block.querySelectorAll('.line').length === 0 && block.parentNode) {
-        block.parentNode.removeChild(block);
+    const part = el && el.parentNode;
+    if (el && part) {
+      part.removeChild(el);
+      const block = part.parentNode;
+      if (part.querySelectorAll('.line').length === 0 && block) {
+        block.removeChild(part);
+        if (!block.querySelector('.line') && block.parentNode) block.parentNode.removeChild(block);
       }
     }
     idx--;
   }
+}
+
+function updateReadEmpty() {
+  const has = $('#lines').children.length > 0;
+  $('#readEmpty').style.display = has ? 'none' : '';
+  $('#btnCapClear').style.visibility = has ? '' : 'hidden';
 }
 
 function highlight(i) {
@@ -299,350 +429,183 @@ function highlight(i) {
     el.classList.toggle('read', j < i);
   }
   const cur = sentences[i];
-  if (cur && cur.el) cur.el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  // Kuyruktaki yeni bloga gecince "ne okunuyor" etiketini guncelle
-  if (cur && cur.label) {
-    const nr = $('#nowReading');
-    if (nr) nr.textContent = 'Okunuyor: ' + cur.label;
-  }
+  if (cur && cur.el && activeTab === 'read') cur.el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
-// ---- Surat durumu + ipuclari ----
+// ---- Surat / durum ----
 function setFace(speaking) {
-  const face = $('#face');
-  face.classList.toggle('speaking', !!speaking);
-  face.classList.toggle('idle', !speaking);
+  $('#face').classList.toggle('speaking', !!speaking);
+  $('#face').classList.toggle('idle', !speaking);
   $('#app').classList.toggle('paused', state === 'paused');
   updateToggleBtn();
 }
+function updateToggleBtn() { $('#btnToggle').classList.toggle('playing', state === 'playing'); }
+function setState(s) { state = s; window.okur.setState({ state }); updateToggleBtn(); }
 
-function updateToggleBtn() {
-  const b = $('#btnToggle');
-  if (b) b.classList.toggle('playing', state === 'playing');
-}
-
-function isQuestionMessage(list) {
-  for (let k = list.length - 1; k >= 0; k--) {
-    const t = (list[k] || '').trim();
-    if (!t) continue;
-    return /[?？]["')\]]*$/.test(t);
+function updateStatus() {
+  const chip = $('#engineChip');
+  const line = $('#statusLine');
+  if (engine === 'chatterbox') {
+    if (serverError) { chip.textContent = 'ses hatası'; chip.className = 'chip err'; chip.title = serverError; }
+    else { chip.textContent = 'doğal ses'; chip.className = 'chip ok'; chip.title = 'Yerel ses sunucusu bağlı (' + (serverEngine || 'edge') + ')'; }
+  } else if (cfg.engine === 'browser') {
+    chip.textContent = 'Windows sesi'; chip.className = 'chip'; chip.title = 'Ayarlar: Motor = Windows sesi';
+  } else if (!serverOk) {
+    chip.textContent = detectTries < 8 && detectTries > 0 ? 'ses aranıyor' : 'Windows sesi';
+    chip.className = 'chip warn';
+    chip.title = 'Doğal ses sunucusu bulunamadı. Ayarlar > Doğal sesler > Kur';
   }
-  return false;
+
+  let txt;
+  const cur = sentences[idx];
+  if (busyText) { txt = busyText; line.className = 'busy'; }
+  else if (state === 'playing' && cur) { txt = 'Okunuyor · ' + langName(cur.lang); line.className = 'reading'; }
+  else if (state === 'paused') { txt = 'Duraklatıldı'; line.className = ''; }
+  else {
+    const tl = cfg.targetLangResolved || 'tr';
+    txt = cfg.translate ? ('Çeviri: ' + langName(tl) + ' · ' + (cfg.voiceGender === 'male' ? 'erkek ses' : 'kadın ses')) : ('Dil otomatik · ' + (cfg.voiceGender === 'male' ? 'erkek ses' : 'kadın ses'));
+    line.className = '';
+  }
+  line.textContent = txt;
+
+  const st = $('#status');
+  if (st) {
+    const eng = engine === 'chatterbox' ? 'Doğal ses' : 'Windows sesi';
+    st.textContent = eng + (serverVoices.length ? ' · ' + serverVoices.length + ' ses' : voices.length ? ' · ' + voices.length + ' ses' : '');
+  }
+  updateVoiceSetupRow();
 }
 
-// Mini mod konusma balonu — pencereyi gecici genisletir, sonra geri kuculur.
+function setBusy(text) { busyText = text || ''; updateStatus(); }
+
+// ---- Bildirim (Claude yaniti) ----
 let bubbleShowing = false;
 let bubbleTimer = null;
 function showBubble(label, isQuestion, title) {
   const b = $('#bubble');
-  if (!b) return;
   $('#bubbleHead').textContent = label + ' · ' + (isQuestion ? 'soru' : 'bitti');
   $('#bubbleText').textContent = title || '';
   b.classList.remove('hidden');
   bubbleShowing = true;
   requestResize();
   clearTimeout(bubbleTimer);
-  bubbleTimer = setTimeout(() => {
-    b.classList.add('hidden');
-    bubbleShowing = false;
-    requestResize();
-  }, 5000);
+  bubbleTimer = setTimeout(() => { b.classList.add('hidden'); bubbleShowing = false; requestResize(); }, 5000);
+}
+
+function flashBadge(text, isQuestion, ms) {
+  const badge = $('#cueBadge');
+  badge.textContent = text;
+  badge.classList.toggle('q', !!isQuestion);
+  badge.classList.add('show');
+  clearTimeout(cueTimer);
+  cueTimer = setTimeout(() => { badge.classList.remove('show'); $('#face').classList.remove('shake', 'blink'); }, ms || 3000);
 }
 
 function playCue(isQuestion, lang, label, title) {
-  const kind = isQuestion ? 'question' : 'done';
-  const face = $('#face');
-  const badge = $('#cueBadge');
-  const text = label || (CUE_WORDS[kind][lang] || CUE_WORDS[kind].en);
-
   if (!cfg.cueFlash) return;
-
-  // Titreme / yanip sonme (her iki modda)
+  const face = $('#face');
   face.classList.remove('shake', 'blink');
-  void face.offsetWidth; // animasyonu yeniden tetikle
+  void face.offsetWidth;
   face.classList.add(isQuestion ? 'blink' : 'shake');
-
   if (cfg.miniMode) {
-    // Mini mod: minik konusma balonu ("para-app · bitti" + kisa baslik)
     showBubble(label || 'Claude', isQuestion, title || '');
     clearTimeout(cueTimer);
-    cueTimer = setTimeout(() => face.classList.remove('shake', 'blink'), 3500);
+    cueTimer = setTimeout(() => face.classList.remove('shake', 'blink'), 3000);
   } else {
-    badge.textContent = text;
-    badge.classList.toggle('q', isQuestion);
-    badge.classList.add('show');
-    clearTimeout(cueTimer);
-    cueTimer = setTimeout(() => {
-      badge.classList.remove('show');
-      face.classList.remove('shake', 'blink');
-    }, 3500);
+    const kind = isQuestion ? 'question' : 'done';
+    flashBadge((label ? label + ' · ' : '') + (CUE_WORDS[kind][lang] || CUE_WORDS[kind].en), isQuestion, 3500);
   }
 }
 
-// ---- Ana sustur ----
+// ---- Sustur ----
 function applyMuted(m) {
   cfg.muted = !!m;
   $('#app').classList.toggle('muted', m);
-  if (m) {
-    stopAll();
-    const badge = $('#cueBadge');
-    if (badge) {
-      badge.textContent = 'Sessiz';
-      badge.classList.remove('q');
-      badge.classList.add('show');
-      clearTimeout(cueTimer);
-      cueTimer = setTimeout(() => badge.classList.remove('show'), 1500);
-    }
-  }
+  if (m) { stopAll(true); flashBadge('Sessiz', false, 1500); }
 }
+function toggleMute() { const m = !cfg.muted; applyMuted(m); window.okur.saveConfig({ muted: m }); }
 
-function toggleMute() {
-  const m = !cfg.muted;
-  applyMuted(m);
-  window.okur.saveConfig({ muted: m });
-}
+// ---- Okuma akisi ----
+const lastMsgs = new Map(); // oturum id -> paket
 
-const STATUS_TEXT = { working: 'çalışıyor', approval: 'onay bekliyor', done: 'bitti' };
-
-// Her oturumun son mesaji (dinle dugmesi icin)
-const lastMsgs = new Map(); // id -> { sentences, lang, label, title }
-
-// Bir metni oku (sağ tık / kısayol / oturum dinle) + ne okunduğunu yaz.
-// KUYRUK: zaten okuma sürüyorsa yarıda kesmez — sona eklenir, sırası gelince okunur.
-function readNow(list, lang, label, title) {
+function readNow(p) {
+  lastPayload = p;
   const startIdx = sentences.length;
-  addSentences(list, lang, label);
-
-  if (state === 'playing') {
-    // Sıraya eklendi — kısa geri bildirim göster
-    const badge = $('#cueBadge');
-    if (badge && !cfg.miniMode) {
-      badge.textContent = 'sıraya eklendi';
-      badge.classList.remove('q');
-      badge.classList.add('show');
-      clearTimeout(cueTimer);
-      cueTimer = setTimeout(() => badge.classList.remove('show'), 1400);
-    }
-    return; // playFrom akışı mevcut cümleler bitince buraya kendiliğinden gelir
-  }
-
-  const nr = $('#nowReading');
-  if (nr) nr.textContent = title ? ('Okunuyor: ' + title) : (label || '');
-  jumpTo(startIdx);
+  addBlock(p);
+  if (!cfg.miniMode) setTab('read');
+  if (state === 'playing') { flashBadge('sıraya eklendi', false, 1400); requestResize(); return; }
+  if (sentences.length > startIdx) jumpTo(startIdx);
+  requestResize();
 }
 
-// ---- Yeni cevap / manuel okuma geldi ----
 function onRead(msg) {
-  const list = msg && msg.sentences;
-  if (!list || !list.length) return;
-  const language = msg.lang || 'en';
-  const label = msg.label || 'Claude';
-
-  // Manuel (seçili/pano metni): hemen oku — mute/autoRead'i yok say.
-  if (msg.manual) {
-    readNow(list, language, label, msg.title || '');
-    return;
-  }
-
-  // Otomatik yanıt: oturum satırı ana bildirimdir (sessions event'i günceller).
-  // Burada: son mesajı sakla + kısa görsel ipucu + isteğe bağlı sesli okuma.
-  if (msg.id) lastMsgs.set(msg.id, { sentences: list, lang: language, label, title: msg.title || '' });
-  playCue(msg.kind === 'approval', language, label, msg.title || '');
+  if (!msg || !msg.src || !msg.src.sentences || !msg.src.sentences.length) return;
+  if (msg.manual) { readNow(msg); return; }
+  if (msg.id) lastMsgs.set(msg.id, msg);
+  playCue(msg.kind === 'approval', msg.src.lang, msg.label, msg.title || '');
   if (cfg.autoRead && !cfg.muted && state === 'idle') {
-    setTimeout(() => { if (state === 'idle') readNow(list, language, label, msg.title || ''); }, 150);
+    setTimeout(() => { if (state === 'idle') readNow(msg); }, 150);
   }
 }
 
-// ---- Oturum barı ----
-const LISTEN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>';
+// ---- Sekmeler ----
+function setTab(name) {
+  activeTab = name;
+  document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.dataset.panel === name));
+  requestResize();
+}
 
+// ---- Oturumlar ----
+const STATUS_TEXT = { working: 'çalışıyor', approval: 'onay bekliyor', done: 'bitti' };
 function fmtTime(ts) {
   const d = new Date(ts || Date.now());
   return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 }
 
 function renderSessions(list) {
-  const wrap = $('#sessions');
   const listEl = $('#sessionList');
-  if (!wrap || !listEl) return;
   listEl.innerHTML = '';
-
   const order = { approval: 0, working: 1, done: 2 };
-  const sorted = (list || []).slice().sort((a, b) =>
-    (order[a.status] ?? 3) - (order[b.status] ?? 3) || (b.ts || 0) - (a.ts || 0));
+  const sorted = (list || []).slice().sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3) || (b.ts || 0) - (a.ts || 0));
 
   for (const s of sorted) {
     const row = document.createElement('div');
     row.className = 'session s-' + (s.status || 'done');
     row.title = 'Tıkla: bu pencereye git';
-
     const head = document.createElement('div');
     head.className = 'shead';
-
-    const dot = document.createElement('span');
-    dot.className = 'sdot';
-
-    const name = document.createElement('span');
-    name.className = 'sname';
-    name.textContent = s.label || '…';
-
-    const st = document.createElement('span');
-    st.className = 'sstate';
-    st.textContent = STATUS_TEXT[s.status] || s.status;
-
-    const time = document.createElement('span');
-    time.className = 'stime';
-    time.textContent = fmtTime(s.ts);
-
-    head.appendChild(dot);
-    head.appendChild(name);
-    head.appendChild(st);
-    head.appendChild(time);
-
-    // Dinle dugmesi: son mesaji sesli oku (satir tiklamasini engelle)
+    const dot = document.createElement('span'); dot.className = 'sdot';
+    const name = document.createElement('span'); name.className = 'sname'; name.textContent = s.label || '…';
+    const st = document.createElement('span'); st.className = 'sstate'; st.textContent = STATUS_TEXT[s.status] || s.status;
+    const time = document.createElement('span'); time.className = 'stime'; time.textContent = fmtTime(s.ts);
+    head.append(dot, name, st, time);
     if (lastMsgs.has(s.id)) {
       const btn = document.createElement('button');
-      btn.className = 'slisten';
+      btn.className = 'icon-btn';
       btn.title = 'Son mesajı dinle';
       btn.innerHTML = LISTEN_SVG;
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const m = lastMsgs.get(s.id);
-        if (m) readNow(m.sentences, m.lang, m.label, m.title);
-      });
+      btn.addEventListener('click', (e) => { e.stopPropagation(); readNow(lastMsgs.get(s.id)); });
       head.appendChild(btn);
     }
-
     row.appendChild(head);
-
-    if (s.status === 'working') {
-      const bar = document.createElement('div');
-      bar.className = 'sbar';
-      row.appendChild(bar);
-    } else if (s.title) {
-      const ttl = document.createElement('div');
-      ttl.className = 'stitle';
-      ttl.textContent = s.title;
-      row.appendChild(ttl);
-    }
-
-    // Satira tikla -> o VS Code penceresine git
+    if (s.status === 'working') { const bar = document.createElement('div'); bar.className = 'sbar'; row.appendChild(bar); }
+    else if (s.title) { const t = document.createElement('div'); t.className = 'stitle'; t.textContent = s.title; row.appendChild(t); }
     row.addEventListener('click', () => window.okur.focusSession(s.id));
     listEl.appendChild(row);
   }
-
-  wrap.classList.toggle('hidden', sorted.length === 0);
+  $('#sessEmpty').style.display = sorted.length ? 'none' : '';
+  const badge = $('#sessBadge');
+  const hot = sorted.filter((s) => s.status === 'approval').length;
+  badge.textContent = hot || sorted.length || '';
+  badge.classList.toggle('show', sorted.length > 0);
+  badge.classList.toggle('hot', hot > 0);
+  requestResize();
 }
 
-// ---- Durum yazisi ----
-function setState(s) { state = s; window.okur.setState({ state }); updateToggleBtn(); }
-
-function updateStatus() {
-  const eng = engine === 'chatterbox' ? 'Chatterbox' : 'Tarayici';
-  const langLabel = cfg.language === 'auto' ? 'oto' : cfg.language;
-  const st = $('#status');
-  if (st) st.textContent = `${eng} • ${langLabel}`;
-}
-
-// ---- Ayar UI ----
-function populateLangSelect() {
-  const sel = $('#setLang');
-  sel.innerHTML = '';
-  for (const [code, label] of LANGS) {
-    const o = document.createElement('option');
-    o.value = code; o.textContent = label;
-    sel.appendChild(o);
-  }
-  sel.value = cfg.language;
-}
-
-function populateVoiceSelect() {
-  const sel = $('#setVoice');
-  if (!sel) return;
-  const prev = cfg.voiceName;
-  sel.innerHTML = '';
-  const auto = document.createElement('option');
-  auto.value = ''; auto.textContent = 'Otomatik (dile göre)';
-  sel.appendChild(auto);
-
-  // Dogal sunucu sesleri (varsa) — en ustte, cunku cok daha akici
-  if (serverVoices.length) {
-    const grp = document.createElement('optgroup');
-    grp.label = 'Doğal sesler (sunucu)';
-    for (const v of serverVoices) {
-      const o = document.createElement('option');
-      o.value = v.name;
-      o.textContent = `${v.name.replace(/Neural$/, '')} (${v.lang}${v.gender ? ', ' + (v.gender === 'Female' ? 'kadın' : 'erkek') : ''})`;
-      grp.appendChild(o);
-    }
-    sel.appendChild(grp);
-  }
-
-  // Tarayici / Windows sesleri
-  if (voices.length) {
-    const grp2 = document.createElement('optgroup');
-    grp2.label = 'Windows sesleri';
-    for (const v of voices) {
-      const o = document.createElement('option');
-      o.value = v.name; o.textContent = `${v.name} (${v.lang})`;
-      grp2.appendChild(o);
-    }
-    sel.appendChild(grp2);
-  }
-  sel.value = prev || '';
-  if (sel.value !== (prev || '')) sel.value = '';
-}
-
-function prettyHotkey(acc) {
-  return String(acc || '')
-    .replace(/CommandOrControl|CmdOrCtrl/gi, 'Ctrl')
-    .replace(/Command|Cmd/gi, 'Cmd')
-    .replace(/Control/gi, 'Ctrl');
-}
-
-function setHotkeyHint(hk, ok) {
-  const hint = $('#hotkeyHint');
-  if (!hint) return;
-  const pk = prettyHotkey(hk);
-  hint.textContent = ok === false
-    ? '⚠ ' + pk + ' kayıt edilemedi (başka uygulamada). Ayarlardan değiştir.'
-    : 'Seç → kopyala (Ctrl+C) → oku. Ya da kısayol: ' + pk;
-}
-
-function applyConfigToUI() {
-  $('#setEngine').value = cfg.engine;
-  $('#setScope').value = cfg.readScope || 'lastParagraph';
-  populateLangSelect();
-  populateVoiceSelect();
-  $('#setRate').value = cfg.rate;
-  $('#rateVal').textContent = (Number(cfg.rate).toFixed(2)) + 'x';
-  $('#setClaudeMode').checked = cfg.claudeMode !== false;
-  $('#setAutoRead').checked = !!cfg.autoRead;
-  $('#setSkipCode').checked = !!cfg.skipCode;
-  $('#setCueFlash').checked = !!cfg.cueFlash;
-  $('#setFilter').value = cfg.projectFilter || '';
-  $('#setHotkey').value = cfg.hotkey || '';
-  $('#setNoteHotkey').value = cfg.noteHotkey || '';
-  $('#setReadOnCopy').checked = !!cfg.readOnCopy;
-  setHotkeyHint(cfg.hotkey, undefined);
-  applyMuted(!!cfg.muted);
-  applyMini(!!cfg.miniMode);
-  renderNotes();
-  if ((cfg.notes || []).length) $('#notes').classList.remove('hidden');
-}
-
-function save(partial) {
-  cfg = { ...cfg, ...partial };
-  window.okur.saveConfig(partial);
-}
-
-// ---- Gorevler panosu ----
-// Kopyala -> not kisayolu -> buraya duser. OKUMAZ; her notun ▶'u ile okunur.
-// Satirlar tiklanabilir todo maddeleridir: isaretledikce ustu cizilir.
+// ---- Gorevler ----
 function noteId() { return 'n' + Math.random().toString(36).slice(2, 9); }
 
-// Yapistirilan metni GERCEK todo maddelerine boler:
-// satirlar -> "1. x 2. y" numarali adimlar -> madde imleri -> uzun tek parca ise cumleler.
 function noteLines(text) {
   let lines = String(text || '').split(/\n+/).map((s) => s.trim()).filter(Boolean);
   lines = lines.flatMap((l) => l.split(/(?=(?:^|\s)\d+[.)]\s)/).map((s) => s.trim()).filter(Boolean));
@@ -651,7 +614,6 @@ function noteLines(text) {
     const parts = lines[0].match(/[^.!?…]+[.!?…]+["')\]]*\s*|[^.!?…]+$/g);
     if (parts && parts.length > 1) lines = parts.map((s) => s.trim()).filter(Boolean);
   }
-  // madde imi/numara onekini temizle (kutucuk zaten var)
   return lines.map((l) => l.replace(/^(\d+[.)]|[-•▪–])\s+/, ''));
 }
 
@@ -663,64 +625,45 @@ function addNote(text) {
   while (notes.length > 20) notes.pop();
   save({ notes });
   renderNotes();
-  // Paneli goster — mini moddaysa mini icinde ac (moddan cikmadan)
-  if (cfg.miniMode) {
-    miniNotesOpen = true;
-    document.getElementById('app').classList.add('notes-open');
-  }
-  $('#settings').classList.add('hidden');
-  $('#speakBox').classList.add('hidden');
-  $('#notes').classList.remove('hidden');
+  if (cfg.miniMode) { miniNotesOpen = true; $('#app').classList.add('notes-open'); }
+  else setTab('notes');
   requestResize();
 }
 
 function renderNotes() {
   const listEl = $('#noteList');
-  if (!listEl) return;
   listEl.innerHTML = '';
   const notes = cfg.notes || [];
   let undoneTotal = 0;
   for (const n of notes) {
     const box = document.createElement('div');
     box.className = 'note';
-
     const head = document.createElement('div');
     head.className = 'note-head';
-
-    const play = document.createElement('button');
-    play.className = 'slisten';
-    play.title = 'Bu notu sesli oku';
-    play.innerHTML = LISTEN_SVG;
-    play.addEventListener('click', (e) => { e.stopPropagation(); window.okur.readText(n.text); });
-
-    const time = document.createElement('span');
-    time.className = 'note-count';
     const lines = n.lines || noteLines(n.text);
     const doneCount = Object.values(n.done || {}).filter(Boolean).length;
     undoneTotal += Math.max(0, lines.length - doneCount);
-    time.textContent = doneCount + '/' + lines.length;
-
+    const count = document.createElement('span');
+    count.className = 'note-count';
+    count.textContent = doneCount + ' / ' + lines.length + ' yapıldı';
+    const play = document.createElement('button');
+    play.className = 'icon-btn'; play.title = 'Sesli oku'; play.innerHTML = LISTEN_SVG;
+    play.addEventListener('click', (e) => { e.stopPropagation(); window.okur.readText(n.text); });
     const del = document.createElement('button');
-    del.className = 'cap-close';
-    del.title = 'Notu sil';
-    del.textContent = '×';
+    del.className = 'icon-btn danger'; del.title = 'Sil'; del.innerHTML = CLOSE_SVG;
     del.addEventListener('click', (e) => {
       e.stopPropagation();
       save({ notes: (cfg.notes || []).filter((x) => x.id !== n.id) });
       renderNotes();
       requestResize();
     });
-
-    head.appendChild(play);
-    head.appendChild(time);
-    head.appendChild(del);
+    head.append(count, play, del);
     box.appendChild(head);
-
     lines.forEach((line, i) => {
       const row = document.createElement('div');
       row.className = 'note-line' + ((n.done || {})[i] ? ' done' : '');
       row.textContent = line;
-      row.title = 'Tıkla: yapıldı işaretle';
+      row.title = 'Tıkla: yapıldı';
       row.addEventListener('click', () => {
         n.done = n.done || {};
         n.done[i] = !n.done[i];
@@ -729,38 +672,148 @@ function renderNotes() {
       });
       box.appendChild(row);
     });
-
     listEl.appendChild(box);
   }
-  const hint = $('#noteHint');
-  if (hint) hint.textContent = notes.length
-    ? ''
-    : 'Kopyala → ' + prettyHotkey(cfg.noteHotkey) + ' → adımlar buraya düşer. Satıra tıkla: yapıldı.';
-
-  // Mini mod cipi: maskotun altinda "n görev"
+  $('#noteEmpty').style.display = notes.length ? 'none' : '';
+  $('#noteHint').textContent = 'Adımları kopyala, ' + prettyHotkey(cfg.noteHotkey) + ' bas: tik atılabilir liste olur.';
+  const badge = $('#notesBadge');
+  badge.textContent = undoneTotal || '';
+  badge.classList.toggle('show', undoneTotal > 0);
   const chip = $('#miniChip');
-  if (chip) {
-    chip.textContent = undoneTotal + ' görev';
-    chip.classList.toggle('has', notes.length > 0);
-  }
+  chip.textContent = undoneTotal + ' görev';
+  chip.classList.toggle('has', notes.length > 0);
 }
 
-// ---- Maskot jestleri: tut-tasi / tek tik = oynat-duraklat / cift tik = mini mod ----
+// ---- Ayarlar ----
+function fillSelect(sel, items, value) {
+  sel.innerHTML = '';
+  for (const [v, label] of items) {
+    const o = document.createElement('option');
+    o.value = v; o.textContent = label;
+    sel.appendChild(o);
+  }
+  sel.value = value;
+  if (sel.value !== value && sel.options.length) sel.selectedIndex = 0;
+}
+
+function populateVoiceSelect() {
+  const langSel = $('#setVoiceLang');
+  const sel = $('#setVoice');
+  if (!langSel || !sel) return;
+  if (!langSel.options.length) fillSelect(langSel, LANGS, cfg.targetLangResolved || 'tr');
+  const lc = langSel.value || 'tr';
+  const cur = (cfg.voiceByLang && cfg.voiceByLang[lc]) || '';
+  sel.innerHTML = '';
+  const auto = document.createElement('option');
+  auto.value = ''; auto.textContent = 'Otomatik (' + (cfg.voiceGender === 'male' ? 'erkek' : 'kadın') + ')';
+  sel.appendChild(auto);
+  const sv = serverVoices.filter((v) => lang2(v.lang) === lc);
+  if (sv.length) {
+    const g = document.createElement('optgroup'); g.label = 'Doğal sesler';
+    for (const v of sv) {
+      const o = document.createElement('option');
+      o.value = v.name;
+      o.textContent = v.name.replace(/^[a-z]{2}-[A-Z]{2}-/, '').replace(/Neural$/, '') + (v.gender ? ' · ' + (v.gender === 'Female' ? 'kadın' : 'erkek') : '');
+      g.appendChild(o);
+    }
+    sel.appendChild(g);
+  }
+  const bv = voices.filter((v) => lang2(v.lang) === lc);
+  if (bv.length) {
+    const g = document.createElement('optgroup'); g.label = 'Windows sesleri';
+    for (const v of bv) { const o = document.createElement('option'); o.value = v.name; o.textContent = v.name.replace(/^Microsoft /, ''); g.appendChild(o); }
+    sel.appendChild(g);
+  }
+  sel.value = cur;
+  if (sel.value !== cur) sel.value = '';
+}
+
+function prettyHotkey(acc) {
+  return String(acc || '').replace(/CommandOrControl|CmdOrCtrl/gi, 'Ctrl').replace(/Command|Cmd/gi, 'Cmd').replace(/Control/gi, 'Ctrl');
+}
+
+function setHotkeyHint(hk, ok) {
+  const hint = $('#hotkeyHint');
+  const pk = prettyHotkey(hk);
+  hint.textContent = ok === false
+    ? pk + ' kısayolu başka bir uygulamada kullanımda. Ayarlardan değiştir.'
+    : 'Kısayol: ' + pk + ' panodaki metni okur.';
+}
+
+function setSeg(id, value) {
+  document.querySelectorAll('#' + id + ' button').forEach((b) => b.classList.toggle('on', b.dataset.v === value));
+}
+
+let voiceSetupState = ''; // '' | 'running' | 'ok' | 'error'
+function updateVoiceSetupRow() {
+  const row = $('#voiceSetupRow');
+  const hint = $('#voiceSetupHint');
+  const btn = $('#btnSetupVoices');
+  if (!row) return;
+  row.className = 'srow voices';
+  btn.disabled = voiceSetupState === 'running';
+  if (voiceSetupState === 'running') { hint.textContent = 'Kuruluyor, bir dakika sürebilir…'; btn.textContent = 'Kuruluyor'; return; }
+  if (voiceSetupState === 'error') { row.classList.add('err'); hint.textContent = 'Kurulum başarısız. Python 3.9+ ve internet gerekir.'; btn.textContent = 'Tekrar dene'; return; }
+  if (serverOk && !serverError) { row.classList.add('ok'); hint.textContent = 'Kurulu ve bağlı. ' + (serverVoices.length ? serverVoices.length + ' doğal ses hazır.' : ''); btn.textContent = 'Güncelle'; }
+  else if (serverOk && serverError) { row.classList.add('err'); hint.textContent = 'Sunucu hata veriyor: güncelleme gerekli.'; btn.textContent = 'Güncelle'; }
+  else { hint.textContent = 'Kurulu değil. Windows sesi kullanılıyor (tek dil).'; btn.textContent = 'Kur'; }
+}
+
+function applyConfigToUI() {
+  $('#app').classList.toggle('auto', !!cfg.autoMode);
+  $('#setAuto').checked = !!cfg.autoMode;
+  fillSelect($('#setTarget'), [['', 'Sistem dili (' + langName(cfg.targetLangResolved || 'tr') + ')'], ...LANGS], cfg.targetLang || '');
+  setSeg('segGender', cfg.voiceGender === 'male' ? 'male' : 'female');
+  setSeg('segReadWhat', cfg.readWhat === 'original' ? 'original' : 'translation');
+  $('#readTools').classList.toggle('no-tr', !cfg.translate);
+  $('#setRate').value = cfg.rate;
+  $('#rateVal').textContent = Number(cfg.rate).toFixed(2) + 'x';
+  $('#setTranslate').checked = !!cfg.translate;
+  $('#setReadOnCopy').checked = !!cfg.readOnCopy;
+  $('#setEngine').value = cfg.engine || 'auto';
+  fillSelect($('#setLang'), [['auto', 'Otomatik algıla'], ...LANGS], cfg.language || 'auto');
+  populateVoiceSelect();
+  $('#setReadWhat').value = cfg.readWhat || 'translation';
+  $('#setClaudeMode').checked = cfg.claudeMode !== false;
+  $('#setScope').value = cfg.readScope || 'lastParagraph';
+  $('#setAutoRead').checked = !!cfg.autoRead;
+  $('#setSkipCode').checked = !!cfg.skipCode;
+  $('#setCueFlash').checked = !!cfg.cueFlash;
+  $('#setFilter').value = cfg.projectFilter || '';
+  $('#setHotkey').value = cfg.hotkey || '';
+  $('#setNoteHotkey').value = cfg.noteHotkey || '';
+  document.querySelector('.tab[data-tab="sessions"]').classList.toggle('hidden', cfg.claudeMode === false);
+  if (cfg.claudeMode === false && activeTab === 'sessions') setTab('read');
+  setHotkeyHint(cfg.hotkey, undefined);
+  applyMuted(!!cfg.muted);
+  applyMini(!!cfg.miniMode);
+  renderNotes();
+  updateStatus();
+}
+
+function save(partial) {
+  cfg = { ...cfg, ...partial };
+  window.okur.saveConfig(partial);
+}
+
+// Seslendirme tercihi degisti: son paketi yeni tercihle yeniden oku
+function rereadLast() {
+  if (!lastPayload || !lastPayload.tr) return;
+  stopAll();
+  readNow(lastPayload);
+}
+
+// ---- Maskot jestleri ----
 let miniNotesOpen = false;
 
 function applyMini(m) {
   cfg.miniMode = !!m;
-  const app = document.getElementById('app');
+  const app = $('#app');
   app.classList.toggle('mini', !!m);
   if (!m) { miniNotesOpen = false; app.classList.remove('notes-open'); }
   requestResize();
 }
-
-function toggleMini() {
-  const m = !cfg.miniMode;
-  applyMini(m);
-  window.okur.saveConfig({ miniMode: m });
-}
+function toggleMini() { const m = !cfg.miniMode; applyMini(m); window.okur.saveConfig({ miniMode: m }); }
 
 function bindFaceGestures() {
   const face = $('#face');
@@ -773,7 +826,6 @@ function bindFaceGestures() {
     const pos = await window.okur.getWinPos();
     drag = { sx: e.screenX, sy: e.screenY, wx: pos[0], wy: pos[1], moved: false };
   });
-
   window.addEventListener('mousemove', (e) => {
     if (!drag) return;
     const dx = e.screenX - drag.sx;
@@ -781,113 +833,108 @@ function bindFaceGestures() {
     if (!drag.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) drag.moved = true;
     if (drag.moved) window.okur.moveWin(drag.wx + dx, drag.wy + dy);
   });
-
   window.addEventListener('mouseup', () => {
     if (!drag) return;
     const wasDrag = drag.moved;
     drag = null;
-    if (wasDrag) return; // tasima — tik degil
-    if (tapTimer) {
-      // ikinci tik: cift tik -> mini mod
-      clearTimeout(tapTimer);
-      tapTimer = null;
-      toggleMini();
-    } else {
-      // tek tik (cift tik icin kisa bekle)
-      tapTimer = setTimeout(() => { tapTimer = null; toggle(); }, 280);
-    }
+    if (wasDrag) return;
+    if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; toggleMini(); }
+    else tapTimer = setTimeout(() => { tapTimer = null; toggle(); }, 280);
   });
-
-  // Sag tik: ayarlari ac (mini moddaysa cikar)
   face.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     if (cfg.miniMode) { applyMini(false); window.okur.saveConfig({ miniMode: false }); }
-    $('#speakBox').classList.add('hidden');
-    $('#settings').classList.remove('hidden');
+    setTab('settings');
+  });
+  $('#miniChip').addEventListener('click', (e) => {
+    e.stopPropagation();
+    miniNotesOpen = !miniNotesOpen;
+    $('#app').classList.toggle('notes-open', miniNotesOpen);
+    if (miniNotesOpen) renderNotes();
     requestResize();
   });
-
-  // Mini mod gorev cipi: tikla -> gorevler paneli ac/kapat (mini icinde)
-  const chip = $('#miniChip');
-  if (chip) {
-    chip.addEventListener('click', (e) => {
-      e.stopPropagation();
-      miniNotesOpen = !miniNotesOpen;
-      document.getElementById('app').classList.toggle('notes-open', miniNotesOpen);
-      if (miniNotesOpen) { renderNotes(); $('#notes').classList.remove('hidden'); }
-      requestResize();
-    });
-  }
 }
 
 function bindUI() {
-  // Surat gorseli yuklenemezse yedek emoji
   const img = $('#faceImg');
-  img.addEventListener('error', () => {
-    img.classList.add('missing');
-    $('#fallbackFace').classList.add('show');
-  });
+  img.addEventListener('error', () => { img.classList.add('missing'); $('#fallbackFace').classList.add('show'); });
 
   bindFaceGestures();
+  document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => setTab(t.dataset.tab)));
+
   $('#btnMute').addEventListener('click', (e) => { e.stopPropagation(); toggleMute(); });
   $('#btnToggle').addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
-  $('#btnStop').addEventListener('click', stopAll);
-  // Ayarlar ve metin kutusu ayni anda acilmasin (compact kalsin)
-  $('#btnSettings').addEventListener('click', () => {
-    $('#speakBox').classList.add('hidden');
-    $('#settings').classList.toggle('hidden');
-  });
-  $('#btnSpeak').addEventListener('click', (e) => {
-    e.stopPropagation();
-    $('#settings').classList.add('hidden');
-    $('#speakBox').classList.toggle('hidden');
-    const t = $('#speakText');
-    if (!$('#speakBox').classList.contains('hidden') && t) t.focus();
+  $('#btnStop').addEventListener('click', () => stopAll(true));
+  $('#btnCapClear').addEventListener('click', () => stopAll());
+
+  $('#btnNewText').addEventListener('click', () => {
+    const box = $('#speakBox');
+    box.classList.toggle('hidden');
+    $('#btnNewText').classList.toggle('on', !box.classList.contains('hidden'));
+    if (!box.classList.contains('hidden')) $('#speakText').focus();
+    requestResize();
   });
   $('#btnReadText').addEventListener('click', () => {
     const t = $('#speakText');
-    if (t && t.value.trim()) { window.okur.readText(t.value); }
+    if (t.value.trim()) { window.okur.readText(t.value); t.value = ''; }
   });
   $('#btnReadClip').addEventListener('click', () => window.okur.readClipboard());
-  // Okunan metin panelini kapat (ses calmaya devam eder; yeni okumada tekrar acilir)
-  $('#btnCapClose').addEventListener('click', (e) => {
-    e.stopPropagation();
-    $('#caption').classList.add('hidden');
-  });
-  // Gorevler panosu ac/kapat
-  $('#btnNotes').addEventListener('click', (e) => {
-    e.stopPropagation();
-    $('#settings').classList.add('hidden');
-    $('#speakBox').classList.add('hidden');
-    $('#notes').classList.toggle('hidden');
-    renderNotes();
-  });
-  $('#btnNotesClose').addEventListener('click', (e) => {
-    e.stopPropagation();
-    $('#notes').classList.add('hidden');
-  });
   $('#btnQuit').addEventListener('click', () => window.okur.quit());
+  $('#btnSetupVoices').addEventListener('click', () => { voiceSetupState = 'running'; updateVoiceSetupRow(); window.okur.setupVoices(); });
 
-  $('#setEngine').addEventListener('change', (e) => { save({ engine: e.target.value }); detectEngine(); });
-  $('#setLang').addEventListener('change', (e) => { save({ language: e.target.value }); updateStatus(); });
-  $('#setVoice').addEventListener('change', (e) => { save({ voiceName: e.target.value }); });
+  document.querySelectorAll('#segReadWhat button').forEach((b) => b.addEventListener('click', () => {
+    save({ readWhat: b.dataset.v });
+    setSeg('segReadWhat', b.dataset.v);
+    $('#setReadWhat').value = b.dataset.v;
+    rereadLast();
+  }));
+  document.querySelectorAll('#segGender button').forEach((b) => b.addEventListener('click', () => {
+    save({ voiceGender: b.dataset.v });
+    setSeg('segGender', b.dataset.v);
+    audioCache.clear();
+    populateVoiceSelect();
+    updateStatus();
+  }));
+
+  $('#setAuto').addEventListener('change', (e) => {
+    const on = e.target.checked;
+    save(on ? { autoMode: true, engine: 'auto', language: 'auto' } : { autoMode: false });
+    $('#app').classList.toggle('auto', on);
+    if (on) { $('#setEngine').value = 'auto'; $('#setLang').value = 'auto'; detectEngine(); }
+  });
+  $('#setTarget').addEventListener('change', (e) => save({ targetLang: e.target.value }));
+  $('#setTranslate').addEventListener('change', (e) => { save({ translate: e.target.checked }); $('#readTools').classList.toggle('no-tr', !e.target.checked); updateStatus(); });
+  $('#setReadOnCopy').addEventListener('change', (e) => save({ readOnCopy: e.target.checked }));
   $('#setRate').addEventListener('input', (e) => {
     const r = Number(e.target.value);
     $('#rateVal').textContent = r.toFixed(2) + 'x';
     save({ rate: r });
+    audioCache.clear();
+  });
+  $('#setEngine').addEventListener('change', (e) => { save({ engine: e.target.value }); detectTries = 0; detectEngine(); });
+  $('#setLang').addEventListener('change', (e) => { save({ language: e.target.value }); updateStatus(); });
+  $('#setVoiceLang').addEventListener('change', populateVoiceSelect);
+  $('#setVoice').addEventListener('change', (e) => {
+    const lc = $('#setVoiceLang').value;
+    const map = { ...(cfg.voiceByLang || {}) };
+    if (e.target.value) map[lc] = e.target.value; else delete map[lc];
+    save({ voiceByLang: map });
+    audioCache.clear();
+  });
+  $('#setReadWhat').addEventListener('change', (e) => { save({ readWhat: e.target.value }); setSeg('segReadWhat', e.target.value === 'original' ? 'original' : 'translation'); });
+  $('#setClaudeMode').addEventListener('change', (e) => {
+    save({ claudeMode: e.target.checked });
+    document.querySelector('.tab[data-tab="sessions"]').classList.toggle('hidden', !e.target.checked);
+    if (!e.target.checked && activeTab === 'sessions') setTab('read');
   });
   $('#setScope').addEventListener('change', (e) => save({ readScope: e.target.value }));
-  $('#setClaudeMode').addEventListener('change', (e) => save({ claudeMode: e.target.checked }));
   $('#setAutoRead').addEventListener('change', (e) => save({ autoRead: e.target.checked }));
   $('#setSkipCode').addEventListener('change', (e) => save({ skipCode: e.target.checked }));
   $('#setCueFlash').addEventListener('change', (e) => save({ cueFlash: e.target.checked }));
   $('#setFilter').addEventListener('change', (e) => save({ projectFilter: e.target.value.trim() }));
-  $('#setHotkey').addEventListener('change', (e) => {
-    save({ hotkey: e.target.value.trim() });
-    setHotkeyHint(e.target.value.trim(), undefined);
-  });
+  $('#setHotkey').addEventListener('change', (e) => { save({ hotkey: e.target.value.trim() }); setHotkeyHint(e.target.value.trim(), undefined); });
   $('#setNoteHotkey').addEventListener('change', (e) => save({ noteHotkey: e.target.value.trim() }));
-  $('#setReadOnCopy').addEventListener('change', (e) => save({ readOnCopy: e.target.checked }));
+  $('#advanced').addEventListener('toggle', requestResize);
 }
 
 // ---- Baslat ----
@@ -896,52 +943,53 @@ window.okur.onConfig((c) => {
   refreshVoices();
   applyConfigToUI();
   detectEngine();
-  updateStatus();
 });
 window.okur.onRead(onRead);
 window.okur.onSessions(renderSessions);
 window.okur.onCommand((msg) => {
   const action = msg && msg.action;
   if (action === 'toggle') toggle();
-  else if (action === 'stop') stopAll();
+  else if (action === 'stop') stopAll(true);
   else if (action === 'muted-on') applyMuted(true);
   else if (action === 'muted-off') applyMuted(false);
   else if (action === 'hotkey') setHotkeyHint(msg.hotkey, msg.ok);
   else if (action === 'add-note') addNote(msg.text);
+  else if (action === 'busy') setBusy(msg.text);
+  else if (action === 'tab') { setTab(msg.tab); if (msg.tab === 'settings') { $('#advanced').open = true; } }
+  else if (action === 'voices-setup') {
+    voiceSetupState = msg.status === 'running' ? 'running' : msg.status === 'ok' ? 'ok' : 'error';
+    if (msg.status === 'ok') { serverVoices = []; detectTries = 0; setTimeout(detectEngine, 2500); }
+    updateVoiceSetupRow();
+  }
 });
 
-// Pencereyi icerige gore boyutla (bos/seffaf alan tiklama yutmasin).
-// Debounce'lu: kucuk oynamalarda surekli resize atma (surukleme rahat kalsin).
+// Pencereyi icerige gore boyutla
 let lastH = 0;
 let lastW = 0;
 function contentWidth() {
-  if (cfg.miniMode) return (bubbleShowing || miniNotesOpen) ? 248 : 68;
-  return 248;
+  if (cfg.miniMode) return (bubbleShowing || miniNotesOpen) ? 320 : 76;
+  return 320;
 }
 let resizeTimer = null;
 function requestResize() {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
-    const app = document.getElementById('app');
-    if (!app) return;
+    const app = $('#app');
     const h = Math.ceil(app.getBoundingClientRect().height) + 4;
     const w = contentWidth();
-    if (Math.abs(h - lastH) > 6 || w !== lastW) {
-      lastH = h;
-      lastW = w;
+    if (Math.abs(h - lastH) > 4 || w !== lastW) {
+      lastH = h; lastW = w;
       window.okur.resize(h, w);
     }
-  }, 180);
+  }, 120);
 }
 
 window.addEventListener('DOMContentLoaded', () => {
   bindUI();
   if (window.speechSynthesis) speechSynthesis.getVoices();
   updateToggleBtn();
-  try {
-    const ro = new ResizeObserver(requestResize);
-    ro.observe(document.getElementById('app'));
-  } catch { /* eski runtime */ }
+  updateReadEmpty();
+  try { new ResizeObserver(requestResize).observe($('#app')); } catch { /* */ }
   window.okur.ready();
   requestResize();
 });

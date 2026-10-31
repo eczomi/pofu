@@ -1,13 +1,14 @@
 {
   "name": "pofu",
   "productName": "Pofu",
-  "version": "0.1.1",
-  "description": "Ekranda yuzen minik ekran okuyucu maskot: secili metni dogal sesle okur; istege bagli Claude Code oturum takibi (calisiyor/onay bekliyor/bitti).",
+  "version": "0.2.0",
+  "description": "Ekranda yuzen minik ekran okuyucu: kopyaladigin metni algilar, senin diline cevirir ve dile uygun dogal sesle okur. Istege bagli Claude Code oturum takibi.",
   "main": "main.js",
   "scripts": {
     "start": "node launch.js",
     "start:direct": "electron .",
-    "dist": "electron-builder --win nsis"
+    "dist": "electron-builder --win nsis",
+    "voices": "node scripts/setup-voices.js"
   },
   "keywords": [
     "claude",
@@ -31,6 +32,7 @@
       "main.js",
       "preload.js",
       "launch.js",
+      "scripts/**/*",
       "src/**/*",
       "renderer/**/*",
       "assets/**/*",

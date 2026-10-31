@@ -2,9 +2,9 @@
   <img src="assets/face.png" width="130" alt="Pofu" />
 
   <h1>Pofu</h1>
-  <p><b>Ekranda yüzen minik ekran okuyucu maskot.</b><br/>
-  Seçtiğin her metni doğal bir sesle okur — göz yorgunluğuna ve görme
-  zorluklarına birebir. Claude Code kullananlara ayrıca oturum takibi sunar.</p>
+  <p><b>Ekranda yüzen minik ekran okuyucu.</b><br/>
+  Kopyaladığın metnin dilini algılar, senin diline çevirir ve dile uygun doğal bir sesle okur.
+  Claude Code kullananlara ayrıca oturum takibi sunar.</p>
 
   <p>
     <a href="https://github.com/eczomi/pofu/releases/latest"><b>⬇️ İndir (Windows) — Pofu-Setup.exe</b></a>
@@ -13,108 +13,104 @@
 
 ---
 
-## 🇹🇷 Ne yapar?
+## Ne yapar?
 
-### Ekran okuyucu (herkes için)
+### Kopyala, dinle (herkes için)
 
-Gözlerin yoruldu mu, uzun bir yazıyı dinlemek mi istiyorsun? Pofu kenarda durur:
+- **Seç → Ctrl+C.** Pofu metni alır, dilini algılar, **senin diline çevirir** ve okur.
+  Çeviri ile orijinal panelde birlikte görünür; okunan cümle vurgulanır.
+- **Çeviriyi mi, orijinali mi?** Okuma panelindeki düğmeyle anında değiştir.
+  İngilizce bir metni Türkçe dinleyebilir ya da İngilizce sesten dinleyebilirsin.
+- **Her dil kendi sesiyle okunur.** Türkçe için Emel/Ahmet, İngilizce için Aria/Guy gibi;
+  "Ses tipi" ayarından kadın/erkek seçersin, gerisi otomatik.
+- **Sağ tık → "Oku (Pofu ile)"** Chrome/Edge uzantısıyla (`browser-extension/`),
+  **kısayol** `Ctrl+Alt+S` panodaki metni okur.
+- **Kuyruk.** Üst üste birkaç şey gönderirsen sırayla okur; ■ hepsini iptal eder.
+- **Görevler.** Adım adım talimatı kopyala → `Ctrl+Alt+Q` → tik atılabilir liste.
 
-- ✋ **Seçtiğin metni okut** (web sayfası, kitap, PDF; yapıştırmadan):
-  - **Sağ tık → "Oku (Pofu ile)"** — Chrome/Edge uzantısıyla (`browser-extension/`)
-  - **Seç → Ctrl+C** — "Kopyalayınca oku" açıkken her uygulamada
-  - **Kısayol** `Ctrl+Alt+S` — panodaki metni okur
-  - Ne okuduğu üstünde yazar; okunan cümle **neon ışıkla** aydınlanır, kaldığın yeri kaybetmezsin
-- ⏯️ **Kuyruk** — üst üste birkaç şey gönderirsen sırayla okur, yarıda kesmez;
-  **■** düğmesi okumayı tamamen iptal eder (kuyruk dahil)
-- 📋 **Görevler panosu** — adım adım talimatı kopyala → `Ctrl+Alt+Q` → tik'lenebilir
-  todo listesi olur; sesli OKUMAZ, istersen ▶ ile dinlersin
+### Otomatik ayar
 
-### Claude Code takibi (isteğe bağlı — Ayarlar'dan aç/kapa)
+Yeni kurulumda **Otomatik ayar** açıktır: motor, okuma dili ve ses Pofu tarafından seçilir.
+Senin yapman gereken en fazla iki şey: *Benim dilim* (varsayılan: sistem dili) ve *Ses tipi* (kadın/erkek).
+Ayarlarla uğraşmak isteyenler için **Gelişmiş** bölümü ayrıca duruyor (motor, sabit dil, dil başına ses seçimi, kısayollar).
 
-Aynı anda 5 projede 10 Claude sekmesiyle çalışanlara:
+### Claude Code takibi (isteğe bağlı)
 
-- 🔔 **Oturum barı** — her Claude oturumu canlı bir satır:
-  **çalışıyor** = akan ışık çubuğu · **onay bekliyor** = parlak nabız · **bitti** = parlak ✓ + son mesajın özeti
-- 🖱️ **Satıra tıkla → o pencereye git** — VS Code'daki o pencere öne gelir
-- Kullanmıyorsan Ayarlar → **"Claude oturum takibi"** kapat: Pofu saf ekran okuyucu olur
-- 🗣️ **Doğal, akıcı sesler** — Türkçe Emel/Ahmet dahil 300+ nöral ses (aşağıya bak)
-- 👆 **Jestler** — maskota: **tek tık** oku/duraklat · **çift tık** mini mod (sadece küçük kafa;
-  bir şey bitince minik konuşma balonu çıkar: "para-app · bitti") · **sürükle** taşı
-- 🌍 **Çok dilli** — mesajın dilini algılar, uygun sesi seçer
-- 🔇 **Sustur** = yalnız ses susar; görsel bildirimler devam eder
-- 🔒 **Gizli** — transcript'ler bilgisayarından çıkmaz; tarayıcı sesi tamamen çevrimdışı
+- **Oturumlar sekmesi:** her Claude oturumu bir satır: çalışıyor / onay bekliyor / bitti + son mesajın özeti.
+- **Satıra tıkla → o VS Code penceresine git.**
+- Kullanmıyorsan Gelişmiş → **Claude oturum takibi** kapat; sekme kaybolur.
 
-### Nasıl çalışır?
+Claude Code her oturumu `~/.claude/projects/**/*.jsonl` dosyasına yazar. Pofu bu dosyaları izler; ekran kazıma, eklenti yok.
 
-Claude Code her oturumu `~/.claude/projects/**/*.jsonl` dosyasına yazar. Pofu bu dosyaları
-izler: dosya büyüyorsa oturum **çalışıyor**dur; yazma durunca yanıt **bitmiştir** (son cümle
-soruysa **onay bekliyor**). Ekran kazıma, eklenti, hile yok — sadece dosya okuma.
+### Jestler
+
+Maskota **tek tık** oku/duraklat · **çift tık** mini mod (yalnız kafa; bir şey bitince minik balon) ·
+**sürükle** taşı · **sağ tık** ayarlar.
 
 ## Kurulum
 
-**Kolay yol (Windows):** [Releases](https://github.com/eczomi/pofu/releases/latest)
-sayfasından `Pofu-Setup.exe` indir, çalıştır. Bitti.
+**Kolay yol (Windows):** [Releases](https://github.com/eczomi/pofu/releases/latest) → `Pofu-Setup.exe`.
 
 **Geliştirici yolu:**
 ```bash
 git clone https://github.com/eczomi/pofu.git
 cd pofu
 npm install
+npm run voices   # doğal sesler (Python 3.9+ gerekir; ~30 sn)
 npm start        # ya da Pofu.vbs'ye çift tıkla (konsolsuz)
 ```
 
-### Doğal sesler (şiddetle önerilir)
+### Doğal sesler
 
-Varsayılan Windows sesi robotiktir. 30 saniyelik kurulumla çok daha akıcı seslere geç:
+Windows'un kendi sesi tek dildir ve robotiktir. `npm run voices` (ya da Ayarlar → **Doğal sesler → Kur**)
+`edge-tts` tabanlı yerel ses sunucusunu kurar; Pofu açılırken sunucuyu kendisi başlatır.
+Türkçe Emel/Ahmet dahil 300+ nöral ses, 19 dil.
 
-```bash
-cd chatterbox-server
-python -m venv .venv
-.venv\Scripts\pip install edge-tts
-```
+> Sunucu "ses hatası" gösteriyorsa `edge-tts` güncel değildir: Ayarlar → Doğal sesler → **Güncelle**
+> (ya da `npm run voices`). Detay ve tamamen çevrimdışı Chatterbox seçeneği: [`chatterbox-server/README.md`](chatterbox-server/README.md)
 
-Pofu'yu yeniden başlat — ses sunucusunu kendisi açar, Ayarlar → Ses listesine
-**"Doğal sesler (sunucu)"** grubu gelir (tr-TR-Emel, tr-TR-Ahmet, en-US-Aria...).
-Detay + tamamen çevrimdışı Chatterbox seçeneği: [`chatterbox-server/README.md`](chatterbox-server/README.md)
+### Çeviri
+
+Çeviri için anahtar gerektirmeyen Google Translate ucu kullanılır (yedek: MyMemory). Metin bu servislere gider;
+istemiyorsan Ayarlar → **Çeviri** kapat. Çeviri yoksa (çevrimdışı) metin orijinal diliyle okunur.
 
 ### Sağ tık → Oku (Chrome / Edge)
 
-`chrome://extensions` → Geliştirici modu → **Paketlenmemiş öğe yükle** →
-`browser-extension` klasörü. Detay: [`browser-extension/README.md`](browser-extension/README.md)
+`chrome://extensions` → Geliştirici modu → **Paketlenmemiş öğe yükle** → `browser-extension` klasörü.
 
-## Ayarlar (⚙)
+## Ayarlar
 
 | Ayar | Açıklama |
 |------|----------|
-| **Motor** | Otomatik / Tarayıcı sesi / Ses sunucusu (doğal) |
-| **Claude oturum takibi** | Kapat → Pofu saf ekran okuyucu (VS Code gerekmez) |
-| **Ne okunsun** | Son paragraf (özet) / Son cümle / Tümü |
-| **Dil** | Otomatik (mesajdan algıla) veya sabit |
-| **Ses** | Doğal sunucu sesleri + Windows sesleri |
+| **Otomatik ayar** | Motor, dil ve sesi Pofu seçer (önerilir) |
+| **Benim dilim** | Çevirilerin hedef dili; boş = sistem dili |
+| **Ses tipi** | Kadın / erkek; her dilde uygun ses seçilir |
 | **Hız** | Konuşma hızı |
-| **Gelince otomatik SESLİ oku** | Varsayılan kapalı (metin öncelikli) |
-| **Kod bloklarını atla** | Kodu sesli okuma (önerilir) |
-| **Bitince titresin** | Görsel bildirim |
+| **Çeviri** | Yabancı metni benim dilime çevir ve göster |
 | **Kopyalayınca oku** | Seç → Ctrl+C → oku |
-| **Proje süzgeci** | Boş = hepsi · `para-app` · `para-app, pofu` (virgülle çoklu) |
-| **Kısayol** | Pano okuma kısayolu (varsayılan `Ctrl+Alt+S`) |
+| **Doğal sesler** | Ses sunucusunu kur / güncelle |
+| Gelişmiş → **Motor** | Otomatik / Doğal ses (sunucu) / Windows sesi |
+| Gelişmiş → **Okuma dili** | Otomatik algıla ya da sabit dil |
+| Gelişmiş → **Ses seçimi** | Dil başına belirli bir ses |
+| Gelişmiş → **Seslendir** | Çeviriyi / orijinali / önce orijinali sonra çeviriyi |
+| Gelişmiş → **Claude oturum takibi** | Kapat → saf ekran okuyucu |
+| Gelişmiş → **Ne okunsun** | Claude yanıtının son paragrafı / son cümlesi / tümü |
+| Gelişmiş → **Kısayollar** | Oku: `Ctrl+Alt+S` · Görev: `Ctrl+Alt+Q` |
 
-## 🇬🇧 English
+## English
 
-Pofu is a tiny floating desktop companion for **Claude Code**. It watches your session
-transcripts (`~/.claude/projects/**/*.jsonl`) and shows a live session bar: **working**
-(animated), **waiting for approval** (glowing pulse), **done** (bright + summary). Click a
-row to jump to that VS Code window. It also reads any selected text aloud (right-click menu
-via the bundled Chrome extension, or Ctrl+C with read-on-copy) using natural neural voices
-(optional local `edge-tts` server; fully-offline Chatterbox also supported). Multilingual,
-private by default. Gestures: single-click = play/pause, double-click = mini mode with tiny
-speech-bubble notifications, drag to move.
+Pofu is a tiny floating screen reader for Windows. Copy any text (Ctrl+C): Pofu detects its language,
+translates it into yours, shows both and reads it aloud with a language-matched neural voice
+(local `edge-tts` server; female/male preference; per-language overrides). Switch between hearing the
+translation or the original with one click. Optional Claude Code session tracking: a live session list
+(working / waiting for approval / done), click a row to jump to that VS Code window. Auto mode picks
+engine, language and voice for you.
 
 ```bash
 git clone https://github.com/eczomi/pofu.git
-cd pofu && npm install && npm start
+cd pofu && npm install && npm run voices && npm start
 ```
 
 ## Lisans / License
 
-MIT — bkz. [LICENSE](LICENSE). Maskot Higgsfield ile üretilmiştir. / Mascot generated with Higgsfield.
+MIT. Bkz. [LICENSE](LICENSE). Maskot Higgsfield ile üretilmiştir. / Mascot generated with Higgsfield.

@@ -2,7 +2,7 @@
 
 const { contextBridge, ipcRenderer } = require('electron');
 
-// Renderer (surat penceresi) ile ana surec arasindaki guvenli kopru.
+// Renderer (maskot penceresi) ile ana surec arasindaki guvenli kopru.
 contextBridge.exposeInMainWorld('okur', {
   onConfig: (cb) => ipcRenderer.on('config', (_e, d) => cb(d)),
   onRead: (cb) => ipcRenderer.on('read', (_e, d) => cb(d)),
@@ -17,5 +17,6 @@ contextBridge.exposeInMainWorld('okur', {
   saveConfig: (c) => ipcRenderer.send('save-config', c),
   readText: (text) => ipcRenderer.send('read-text', { text }),
   readClipboard: () => ipcRenderer.send('read-clipboard'),
+  setupVoices: () => ipcRenderer.send('setup-voices'),
   quit: () => ipcRenderer.send('quit'),
 });

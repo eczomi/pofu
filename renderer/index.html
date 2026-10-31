@@ -8,139 +8,208 @@
   <title>Pofu</title>
 </head>
 <body>
-  <!-- Arka plan tamamen suruklenebilir; etkilesimli ogeler no-drag -->
   <div id="app">
-    <!-- Tutma cubugu: her zaman gorunur tasima alani -->
-    <div id="grip" title="Tut ve taşı"><span></span><span></span><span></span></div>
-
-    <!-- Baslik: maskot + kontroller (yatay, compact) -->
-    <div id="header">
-      <div id="stage">
-        <div id="halo"></div>
-        <div id="face" class="idle" title="Tıkla: oku / duraklat">
-          <div id="ring"></div>
-          <img id="faceImg" src="../assets/face.png" alt="" />
-          <div id="fallbackFace">✨</div>
-        </div>
-        <div id="cueBadge"></div>
-        <!-- Mini mod gorev cipi: "2 görev" -->
-        <button id="miniChip" title="Görevler"></button>
+    <!-- Mini mod: yalniz maskot (+ balon + gorev cipi) -->
+    <div id="stage">
+      <div id="face" class="idle" title="Tıkla: oku / duraklat · Çift tık: mini mod · Sağ tık: ayarlar">
+        <div id="ring"></div>
+        <img id="faceImg" src="../assets/face.png" alt="" />
+        <div id="fallbackFace">✨</div>
       </div>
-      <!-- Mini mod konusma balonu: "para-app · bitti" + kisa baslik -->
-      <div id="bubble" class="hidden"><b id="bubbleHead"></b><span id="bubbleText"></span></div>
-      <div id="headRight">
+      <div id="cueBadge"></div>
+      <button id="miniChip" title="Görevler"></button>
+    </div>
+    <div id="bubble" class="hidden"><b id="bubbleHead"></b><span id="bubbleText"></span></div>
+
+    <!-- Normal mod: tek kart -->
+    <div id="card">
+      <div id="grip" title="Tut ve taşı"><span></span></div>
+
+      <header id="header">
+        <div id="headMain">
+          <div id="titleRow">
+            <span id="appName">Pofu</span>
+            <span id="engineChip" class="chip">ses aranıyor</span>
+          </div>
+          <div id="statusLine">Hazır</div>
+        </div>
         <div id="controls">
           <button id="btnToggle" class="ctl primary" title="Oku / Duraklat">
             <svg class="ic ic-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.2v13.6a1 1 0 0 0 1.5.87l11-6.8a1 1 0 0 0 0-1.74l-11-6.8A1 1 0 0 0 8 5.2Z"/></svg>
-            <svg class="ic ic-pause" viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="5" width="3.4" height="14" rx="1.4"/><rect x="13.6" y="5" width="3.4" height="14" rx="1.4"/></svg>
+            <svg class="ic ic-pause" viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="5" width="3.4" height="14" rx="1.2"/><rect x="13.6" y="5" width="3.4" height="14" rx="1.2"/></svg>
           </button>
-          <button id="btnStop" class="ctl" title="Durdur">
-            <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="6.5" width="11" height="11" rx="3.2"/></svg>
+          <button id="btnStop" class="ctl" title="Durdur (kuyruğu da temizler)">
+            <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="6.5" width="11" height="11" rx="2.5"/></svg>
           </button>
-          <button id="btnMute" class="ctl" title="Sesi sustur / aç (bildirimler devam eder)">
-            <svg class="ic ic-vol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
-            <svg class="ic ic-mute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="m16.5 9.5 5 5"/><path d="m21.5 9.5-5 5"/></svg>
-          </button>
-          <button id="btnSpeak" class="ctl" title="Metin okut">
-            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 5h15a1 1 0 0 1 1 1v8.5a1 1 0 0 1-1 1H9.5l-4 3.5v-3.5h-1a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/><path d="M10.5 8.6v4.3l3.8-2.15-3.8-2.15Z" fill="currentColor" stroke="none"/></svg>
-          </button>
-          <button id="btnNotes" class="ctl" title="Görevler panosu (kopyala → Ctrl+Alt+Q)">
-            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 4.5V3.2A1.2 1.2 0 0 1 10.2 2h3.6A1.2 1.2 0 0 1 15 3.2v1.3"/><path d="m8.6 11 1.6 1.6L13.4 9.4"/><path d="M8.8 16.5h6.4"/></svg>
-          </button>
-          <button id="btnSettings" class="ctl" title="Ayarlar">
-            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .34 1.87l.05.05a2 2 0 1 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.13a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 0 1 0-4h.13a1.7 1.7 0 0 0 1.56-1.11 1.7 1.7 0 0 0-.34-1.87l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05a1.7 1.7 0 0 0 1.87.34h.08A1.7 1.7 0 0 0 10 4.73V4a2 2 0 0 1 4 0v.13a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.05-.05a2 2 0 1 1 2.83 2.83l-.05.05a1.7 1.7 0 0 0-.34 1.87v.08a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 0 1 0 4h-.13a1.7 1.7 0 0 0-1.47 1.06Z"/></svg>
+          <button id="btnMute" class="ctl" title="Sesi sustur / aç">
+            <svg class="ic ic-vol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
+            <svg class="ic ic-mute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="m16.5 9.5 5 5"/><path d="m21.5 9.5-5 5"/></svg>
           </button>
         </div>
-        <div id="nowReading"></div>
-      </div>
-    </div>
+      </header>
 
-    <!-- Oturum bari: hangi sekme calisiyor / onay bekliyor / bitti -->
-    <div id="sessions" class="sheet hidden">
-      <div id="sessionList"></div>
-    </div>
+      <nav id="tabs" role="tablist">
+        <button class="tab active" data-tab="read" role="tab">Okuma</button>
+        <button class="tab" data-tab="notes" role="tab">Görevler<span class="badge" id="notesBadge"></span></button>
+        <button class="tab" data-tab="sessions" role="tab">Oturumlar<span class="badge" id="sessBadge"></span></button>
+        <button class="tab" data-tab="settings" role="tab">Ayarlar</button>
+      </nav>
 
-    <!-- Gorevler panosu: kopyala -> kisayol -> buraya duser (OKUMAZ; ▶ ile okunur) -->
-    <div id="notes" class="sheet hidden">
-      <div class="cap-head">
-        <span>Görevler</span>
-        <button id="btnNotesClose" class="cap-close" title="Paneli kapat">×</button>
-      </div>
-      <div id="noteList"></div>
-      <div class="hint" id="noteHint"></div>
-    </div>
+      <!-- OKUMA -->
+      <section id="panelRead" class="panel active" data-panel="read">
+        <div id="readTools">
+          <div class="seg" id="segReadWhat" title="Hangisi seslendirilsin">
+            <button data-v="translation">Çeviriyi oku</button>
+            <button data-v="original">Orijinali oku</button>
+          </div>
+          <span class="spacer"></span>
+          <button id="btnNewText" class="tbtn" title="Metin yapıştır">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <button id="btnCapClear" class="tbtn" title="Listeyi temizle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
+          </button>
+        </div>
+        <div id="speakBox" class="hidden">
+          <textarea id="speakText" rows="3" placeholder="Okunacak metni buraya yapıştır"></textarea>
+          <div class="row-actions">
+            <button id="btnReadText" class="btn">Oku</button>
+            <button id="btnReadClip" class="btn ghost">Panoyu oku</button>
+          </div>
+        </div>
+        <div id="lines"></div>
+        <div id="readEmpty" class="empty">
+          <p class="empty-title">Metni seç, <kbd>Ctrl</kbd>+<kbd>C</kbd> yap.</p>
+          <p class="empty-text">Pofu dili algılar, senin diline çevirir ve doğal bir sesle okur.</p>
+          <p class="hint" id="hotkeyHint"></p>
+        </div>
+      </section>
 
-    <!-- Metin okut kutusu -->
-    <div id="speakBox" class="sheet hidden">
-      <textarea id="speakText" placeholder="Okumak istediğin metni buraya yapıştır…"></textarea>
-      <div class="speak-actions">
-        <button id="btnReadText" class="btn-soft">Oku</button>
-        <button id="btnReadClip" class="btn-soft">Panoyu oku</button>
-      </div>
-      <div class="hint" id="hotkeyHint"></div>
-    </div>
+      <!-- GOREVLER -->
+      <section id="panelNotes" class="panel" data-panel="notes">
+        <div id="noteList"></div>
+        <div class="empty" id="noteEmpty">
+          <p class="empty-title">Görev listesi boş.</p>
+          <p class="empty-text" id="noteHint"></p>
+        </div>
+      </section>
 
-    <!-- Okunan metin: isikla aydinlatilmis son konum -->
-    <div id="caption" class="sheet hidden">
-      <div class="cap-head">
-        <span>Okunan metin</span>
-        <button id="btnCapClose" class="cap-close" title="Paneli kapat (okuma sürerse devam eder)">×</button>
-      </div>
-      <div id="lines"></div>
-    </div>
+      <!-- OTURUMLAR -->
+      <section id="panelSessions" class="panel" data-panel="sessions">
+        <div id="sessionList"></div>
+        <div class="empty" id="sessEmpty">
+          <p class="empty-title">Aktif Claude oturumu yok.</p>
+          <p class="empty-text">VS Code'da Claude Code çalışınca oturumlar burada listelenir.</p>
+        </div>
+      </section>
 
-    <!-- Ayarlar -->
-    <div id="settings" class="sheet hidden">
-      <div class="srow">
-        <label>Motor</label>
-        <select id="setEngine">
-          <option value="auto">Otomatik</option>
-          <option value="browser">Tarayıcı sesi</option>
-          <option value="chatterbox">Ses sunucusu (doğal)</option>
-        </select>
-      </div>
-      <div class="srow">
-        <label>Ne okunsun</label>
-        <select id="setScope">
-          <option value="lastParagraph">Son paragraf (özet)</option>
-          <option value="lastSentence">Son cümle</option>
-          <option value="all">Tümü</option>
-        </select>
-      </div>
-      <div class="srow">
-        <label>Dil</label>
-        <select id="setLang"></select>
-      </div>
-      <div class="srow">
-        <label>Ses</label>
-        <select id="setVoice"></select>
-      </div>
-      <div class="srow">
-        <label>Hız</label>
-        <input id="setRate" type="range" min="0.6" max="1.8" step="0.05" />
-        <span id="rateVal" class="hint">1.0x</span>
-      </div>
-      <div class="srow check"><label><input id="setClaudeMode" type="checkbox" /> Claude oturum takibi (VS Code)</label></div>
-      <div class="srow check"><label><input id="setAutoRead" type="checkbox" /> Gelince otomatik SESLİ oku</label></div>
-      <div class="srow check"><label><input id="setSkipCode" type="checkbox" /> Kod bloklarını atla</label></div>
-      <div class="srow check"><label><input id="setCueFlash" type="checkbox" /> Bitince titresin</label></div>
-      <div class="srow check"><label><input id="setReadOnCopy" type="checkbox" /> Kopyalayınca oku (seç → Ctrl+C)</label></div>
-      <div class="srow">
-        <label>Proje süzgeci</label>
-        <input id="setFilter" type="text" placeholder="hepsi (boş bırak)" />
-      </div>
-      <div class="srow">
-        <label>Kısayol</label>
-        <input id="setHotkey" type="text" placeholder="CommandOrControl+Alt+S" />
-      </div>
-      <div class="srow">
-        <label>Not kısayolu</label>
-        <input id="setNoteHotkey" type="text" placeholder="CommandOrControl+Alt+Q" />
-      </div>
-      <div class="srow foot">
-        <span id="status" class="hint"></span>
-        <button id="btnQuit" class="btn-soft danger">Çıkış</button>
-      </div>
+      <!-- AYARLAR -->
+      <section id="panelSettings" class="panel" data-panel="settings">
+        <div class="srow switch">
+          <div class="slabel"><b>Otomatik ayar</b><small>Motor, dil ve sesi Pofu seçer. Önerilir.</small></div>
+          <input id="setAuto" type="checkbox" class="sw" />
+        </div>
+        <div class="srow">
+          <label for="setTarget">Benim dilim</label>
+          <select id="setTarget"></select>
+        </div>
+        <div class="srow">
+          <label>Ses tipi</label>
+          <div class="seg" id="segGender">
+            <button data-v="female">Kadın</button>
+            <button data-v="male">Erkek</button>
+          </div>
+        </div>
+        <div class="srow">
+          <label for="setRate">Hız</label>
+          <input id="setRate" type="range" min="0.6" max="1.8" step="0.05" />
+          <span id="rateVal" class="val">1.00x</span>
+        </div>
+        <div class="srow switch">
+          <div class="slabel"><b>Çeviri</b><small>Yabancı metni benim dilime çevir ve göster</small></div>
+          <input id="setTranslate" type="checkbox" class="sw" />
+        </div>
+        <div class="srow switch">
+          <div class="slabel"><b>Kopyalayınca oku</b><small>Seç, Ctrl+C: hemen okur</small></div>
+          <input id="setReadOnCopy" type="checkbox" class="sw" />
+        </div>
+
+        <div class="srow voices" id="voiceSetupRow">
+          <div class="slabel"><b>Doğal sesler</b><small id="voiceSetupHint">Kurulu değil. Windows sesi kullanılıyor.</small></div>
+          <button id="btnSetupVoices" class="btn small">Kur</button>
+        </div>
+
+        <details id="advanced">
+          <summary>Gelişmiş</summary>
+          <div class="adv-lock-note">Otomatik ayar açıkken motor, dil ve ses seçimleri Pofu tarafından yönetilir.</div>
+          <div class="srow lockable">
+            <label for="setEngine">Motor</label>
+            <select id="setEngine">
+              <option value="auto">Otomatik</option>
+              <option value="chatterbox">Doğal ses (sunucu)</option>
+              <option value="browser">Windows sesi</option>
+            </select>
+          </div>
+          <div class="srow lockable">
+            <label for="setLang">Okuma dili</label>
+            <select id="setLang"></select>
+          </div>
+          <div class="srow lockable">
+            <label for="setVoiceLang">Ses seçimi</label>
+            <select id="setVoiceLang" class="narrow"></select>
+            <select id="setVoice"></select>
+          </div>
+          <div class="srow">
+            <label for="setReadWhat">Seslendir</label>
+            <select id="setReadWhat">
+              <option value="translation">Çeviriyi</option>
+              <option value="original">Orijinali</option>
+              <option value="both">Önce orijinali, sonra çeviriyi</option>
+            </select>
+          </div>
+          <div class="srow switch">
+            <div class="slabel"><b>Claude oturum takibi</b><small>VS Code'daki Claude Code oturumlarını izle</small></div>
+            <input id="setClaudeMode" type="checkbox" class="sw" />
+          </div>
+          <div class="srow">
+            <label for="setScope">Ne okunsun</label>
+            <select id="setScope">
+              <option value="lastParagraph">Son paragraf</option>
+              <option value="lastSentence">Son cümle</option>
+              <option value="all">Tümü</option>
+            </select>
+          </div>
+          <div class="srow switch">
+            <div class="slabel"><b>Yanıt gelince sesli oku</b></div>
+            <input id="setAutoRead" type="checkbox" class="sw" />
+          </div>
+          <div class="srow switch">
+            <div class="slabel"><b>Kod bloklarını atla</b></div>
+            <input id="setSkipCode" type="checkbox" class="sw" />
+          </div>
+          <div class="srow switch">
+            <div class="slabel"><b>Bitince görsel uyarı</b></div>
+            <input id="setCueFlash" type="checkbox" class="sw" />
+          </div>
+          <div class="srow">
+            <label for="setFilter">Proje süzgeci</label>
+            <input id="setFilter" type="text" placeholder="boş = hepsi" />
+          </div>
+          <div class="srow">
+            <label for="setHotkey">Oku kısayolu</label>
+            <input id="setHotkey" type="text" placeholder="CommandOrControl+Alt+S" />
+          </div>
+          <div class="srow">
+            <label for="setNoteHotkey">Görev kısayolu</label>
+            <input id="setNoteHotkey" type="text" placeholder="CommandOrControl+Alt+Q" />
+          </div>
+        </details>
+
+        <div class="srow foot">
+          <span id="status" class="hint"></span>
+          <button id="btnQuit" class="btn small danger">Çıkış</button>
+        </div>
+      </section>
     </div>
   </div>
   <script src="face.js"></script>
