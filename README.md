@@ -94,6 +94,7 @@ istemiyorsan Ayarlar → **Çeviri** kapat. Çeviri yoksa (çevrimdışı) metin
 | Gelişmiş → **Ses seçimi** | Dil başına belirli bir ses |
 | Gelişmiş → **Seslendir** | Çeviriyi / orijinali / önce orijinali sonra çeviriyi |
 | Gelişmiş → **Claude oturum takibi** | Kapat → saf ekran okuyucu |
+| Gelişmiş → **Bitince ses** | Claude yanıtı bitince bildirim sesi: Kapalı / Çan / Ping / Zil / Pop / Marimba (soruda yükselen nota) |
 | Gelişmiş → **Ne okunsun** | Claude yanıtının son paragrafı / son cümlesi / tümü |
 | Gelişmiş → **Kısayollar** | Oku: `Ctrl+Alt+S` · Görev: `Ctrl+Alt+Q` |
 

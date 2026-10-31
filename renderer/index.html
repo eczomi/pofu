@@ -192,6 +192,20 @@
             <input id="setCueFlash" type="checkbox" class="sw" />
           </div>
           <div class="srow">
+            <label for="setCueSound">Bitince ses</label>
+            <select id="setCueSound">
+              <option value="off">Kapalı</option>
+              <option value="chime">Çan (iki nota)</option>
+              <option value="ping">Ping</option>
+              <option value="bell">Zil</option>
+              <option value="pop">Pop</option>
+              <option value="marimba">Marimba</option>
+            </select>
+            <button id="btnCueTest" class="icon-btn" title="Dinle">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.2v13.6a1 1 0 0 0 1.5.87l11-6.8a1 1 0 0 0 0-1.74l-11-6.8A1 1 0 0 0 8 5.2Z"/></svg>
+            </button>
+          </div>
+          <div class="srow">
             <label for="setFilter">Proje süzgeci</label>
             <input id="setFilter" type="text" placeholder="boş = hepsi" />
           </div>

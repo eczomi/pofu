@@ -6,7 +6,7 @@ let cfg = {
   readWhat: 'translation', voiceGender: 'female',
   engine: 'auto', chatterboxUrl: 'http://127.0.0.1:7888', rate: 1.0, language: 'auto',
   voiceByLang: {}, skipCode: true, claudeMode: true, autoRead: false, readScope: 'lastParagraph',
-  cueFlash: true, muted: false, projectFilter: '', hotkey: 'CommandOrControl+Alt+S',
+  cueFlash: true, cueSound: 'chime', muted: false, projectFilter: '', hotkey: 'CommandOrControl+Alt+S',
   noteHotkey: 'CommandOrControl+Alt+Q', notes: [], readOnCopy: true, miniMode: false,
 };
 
@@ -501,7 +501,48 @@ function flashBadge(text, isQuestion, ms) {
   cueTimer = setTimeout(() => { badge.classList.remove('show'); $('#face').classList.remove('shake', 'blink'); }, ms || 3000);
 }
 
+// ---- Bildirim sesleri (Web Audio; dosya gerekmez) ----
+// Her ses: nota listesi { f: frekans, t: baslangic (s), d: sure (s), w: dalga, g: kazanc }
+const SOUNDS = {
+  ping:    [{ f: 880, t: 0, d: 0.22, w: 'sine' }],
+  chime:   [{ f: 659, t: 0, d: 0.18, w: 'sine' }, { f: 988, t: 0.13, d: 0.32, w: 'sine' }],
+  bell:    [{ f: 1318, t: 0, d: 0.7, w: 'triangle' }, { f: 2637, t: 0, d: 0.35, w: 'sine', g: 0.25 }],
+  pop:     [{ f: 420, t: 0, d: 0.07, w: 'square', g: 0.35 }, { f: 640, t: 0.07, d: 0.09, w: 'square', g: 0.3 }],
+  marimba: [{ f: 523, t: 0, d: 0.22, w: 'triangle' }, { f: 784, t: 0.14, d: 0.3, w: 'triangle' }],
+};
+let actx = null;
+
+function playCueSound(name, isQuestion) {
+  const notes = SOUNDS[name];
+  if (!notes || cfg.muted) return;
+  try {
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+    const seq = notes.slice();
+    if (isQuestion) {
+      // Soru: sona yukselen bir nota ekle
+      const last = notes[notes.length - 1];
+      seq.push({ f: last.f * 1.5, t: last.t + last.d * 0.7, d: 0.35, w: last.w, g: last.g });
+    }
+    const t0 = actx.currentTime + 0.02;
+    for (const n of seq) {
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      osc.type = n.w || 'sine';
+      osc.frequency.value = n.f;
+      const g = (n.g == null ? 0.5 : n.g) * 0.5;
+      gain.gain.setValueAtTime(0.0001, t0 + n.t);
+      gain.gain.exponentialRampToValueAtTime(g, t0 + n.t + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + n.t + n.d);
+      osc.connect(gain).connect(actx.destination);
+      osc.start(t0 + n.t);
+      osc.stop(t0 + n.t + n.d + 0.05);
+    }
+  } catch { /* ses yoksa sessiz gec */ }
+}
+
 function playCue(isQuestion, lang, label, title) {
+  playCueSound(cfg.cueSound, isQuestion);
   if (!cfg.cueFlash) return;
   const face = $('#face');
   face.classList.remove('shake', 'blink');
@@ -779,6 +820,8 @@ function applyConfigToUI() {
   $('#setAutoRead').checked = !!cfg.autoRead;
   $('#setSkipCode').checked = !!cfg.skipCode;
   $('#setCueFlash').checked = !!cfg.cueFlash;
+  $('#setCueSound').value = cfg.cueSound || 'chime';
+  if ($('#setCueSound').value !== (cfg.cueSound || 'chime')) $('#setCueSound').value = 'chime';
   $('#setFilter').value = cfg.projectFilter || '';
   $('#setHotkey').value = cfg.hotkey || '';
   $('#setNoteHotkey').value = cfg.noteHotkey || '';
@@ -931,6 +974,8 @@ function bindUI() {
   $('#setAutoRead').addEventListener('change', (e) => save({ autoRead: e.target.checked }));
   $('#setSkipCode').addEventListener('change', (e) => save({ skipCode: e.target.checked }));
   $('#setCueFlash').addEventListener('change', (e) => save({ cueFlash: e.target.checked }));
+  $('#setCueSound').addEventListener('change', (e) => { save({ cueSound: e.target.value }); playCueSound(e.target.value, false); });
+  $('#btnCueTest').addEventListener('click', () => playCueSound(cfg.cueSound, false));
   $('#setFilter').addEventListener('change', (e) => save({ projectFilter: e.target.value.trim() }));
   $('#setHotkey').addEventListener('change', (e) => { save({ hotkey: e.target.value.trim() }); setHotkeyHint(e.target.value.trim(), undefined); });
   $('#setNoteHotkey').addEventListener('change', (e) => save({ noteHotkey: e.target.value.trim() }));
@@ -955,7 +1000,10 @@ window.okur.onCommand((msg) => {
   else if (action === 'hotkey') setHotkeyHint(msg.hotkey, msg.ok);
   else if (action === 'add-note') addNote(msg.text);
   else if (action === 'busy') setBusy(msg.text);
-  else if (action === 'tab') { setTab(msg.tab); if (msg.tab === 'settings') { $('#advanced').open = true; } }
+  else if (action === 'tab') {
+    setTab(msg.tab);
+    if (msg.tab === 'settings') { $('#advanced').open = true; setTimeout(() => $('#setCueSound').scrollIntoView({ block: 'center' }), 300); }
+  }
   else if (action === 'voices-setup') {
     voiceSetupState = msg.status === 'running' ? 'running' : msg.status === 'ok' ? 'ok' : 'error';
     if (msg.status === 'ok') { serverVoices = []; detectTries = 0; setTimeout(detectEngine, 2500); }

@@ -35,6 +35,7 @@ const DEFAULT_CONFIG = {
   readScope: 'lastParagraph',              // 'all' | 'lastParagraph' | 'lastSentence'
   settleMs: 2500,
   cueFlash: true,
+  cueSound: 'chime',                       // bitince bildirim sesi: 'off' | 'ping' | 'chime' | 'bell' | 'pop' | 'marimba'
   muted: false,
   projectFilter: '',
   hotkey: 'CommandOrControl+Alt+S',
@@ -97,7 +98,9 @@ function loadConfig() {
   }
   delete c.voiceName;
   delete c.startWithWindows;
-  delete c.cueSound;
+  // Eski surumlerde cueSound true/false idi; simdi ses adi
+  if (typeof c.cueSound === 'boolean') c.cueSound = c.cueSound ? 'chime' : 'off';
+  if (!c.cueSound) c.cueSound = 'chime';
   if (!c.voiceByLang || typeof c.voiceByLang !== 'object') c.voiceByLang = {};
   return c;
 }
@@ -712,6 +715,8 @@ ipcMain.on('setup-voices', () => setupVoices());
 ipcMain.on('quit', () => { app.isQuiting = true; app.quit(); });
 
 // ---- Yasam dongusu ----
+// Gelistirici: OKUR_USERDATA=klasor -> ayri profil (calisan Pofu'yla cakismaz)
+if (process.env.OKUR_USERDATA) app.setPath('userData', process.env.OKUR_USERDATA);
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
