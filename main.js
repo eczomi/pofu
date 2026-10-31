@@ -197,7 +197,21 @@ function createWindow() {
     moveSaveTimer = setTimeout(savePos, 400);
   });
 
+  // Alt+F4 vb. pencereyi YOK ETMESIN: gizle; tepsiden ya da tekrar acarak geri gelir.
+  // (Eskiden pencere kapaninca Pofu tepside penceresiz kaliyor, "acilmiyor" sanilıyordu.)
+  win.on('close', (e) => {
+    if (app.isQuiting) return;
+    e.preventDefault();
+    win.hide();
+  });
   win.on('closed', () => { win = null; });
+}
+
+// Pencere yoksa yeniden olustur, varsa goster ve one getir.
+function showWindow() {
+  if (!win || win.isDestroyed()) { createWindow(); }
+  win.show();
+  win.setAlwaysOnTop(true, 'screen-saver');
 }
 
 // Boyutlandirma: tasima ve boyut HEP birlikte (setBounds) verilir; olcekli
@@ -336,9 +350,9 @@ function setMuted(m) {
 }
 
 function toggleWindow() {
-  if (!win) return;
+  if (!win || win.isDestroyed()) { showWindow(); return; }
   if (win.isVisible()) win.hide();
-  else { win.show(); win.setAlwaysOnTop(true, 'screen-saver'); }
+  else showWindow();
 }
 
 function sendCommand(action, extra) {
@@ -587,6 +601,7 @@ async function manualRead(rawText, label) {
   const payload = await buildRead(text, { label: label || 'Seçili metin', manual: true, kind: 'manual', isQuestion: false });
   if (!payload) return;
   dlog('manuel oku:', payload.src.sentences.length, 'cumle, lang=' + payload.src.lang, payload.tr ? '-> ' + payload.tr.lang : '');
+  if (!win || win.isDestroyed()) showWindow();
   if (win && !win.isDestroyed()) {
     if (!win.isVisible()) win.show();
     win.webContents.send('read', payload);
@@ -750,8 +765,10 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
+  // Ikinci kez calistirilinca (kisayol/Pofu.vbs) mevcut pencereyi goster.
   app.on('second-instance', () => {
-    if (win) { win.show(); win.focus(); }
+    showWindow();
+    try { win.focus(); } catch { /* */ }
   });
 
   app.whenReady().then(() => {
