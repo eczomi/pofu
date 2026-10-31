@@ -18,5 +18,6 @@ contextBridge.exposeInMainWorld('okur', {
   readText: (text) => ipcRenderer.send('read-text', { text }),
   readClipboard: () => ipcRenderer.send('read-clipboard'),
   setupVoices: () => ipcRenderer.send('setup-voices'),
+  translateSnippet: (text) => ipcRenderer.invoke('translate-snippet', { text }),
   quit: () => ipcRenderer.send('quit'),
 });

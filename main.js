@@ -663,6 +663,7 @@ function runDemo() {
   setTimeout(() => manualRead(demo, 'Kopyalanan metin'), 800);
   if (process.env.OKUR_DEMO === '2') setTimeout(() => manualRead('İkinci metin: bu yeni kopyalanan yazı, eskisini kesmeli.', 'Kopyalanan metin'), 4500);
   if (process.env.OKUR_DEMO_TAB) setTimeout(() => sendCommand('tab', { tab: process.env.OKUR_DEMO_TAB }), 5000);
+  if (process.env.OKUR_DEMO_SEL) setTimeout(() => sendCommand('demo-sel'), Number(process.env.OKUR_DEMO_SEL));
   if (process.env.OKUR_DEMO_CUE && win) setTimeout(() => win.webContents.send('read', {
     id: 'a', label: 'para-app', kind: 'approval', isQuestion: true, manual: false,
     title: 'Veritabanı şemasını değiştireyim mi?',
@@ -728,6 +729,18 @@ ipcMain.on('save-config', (_e, partial) => {
 ipcMain.on('read-text', (_e, payload) => manualRead(payload && payload.text, 'Yazılan metin'));
 ipcMain.on('read-clipboard', () => manualRead(clipboard.readText(), 'Pano'));
 ipcMain.on('setup-voices', () => setupVoices());
+
+// Panelde secilen kelime/cumle icin kisa ceviri (ceviri kapaliysa bos doner)
+ipcMain.handle('translate-snippet', async (_e, payload) => {
+  const text = String((payload && payload.text) || '').trim().slice(0, 300);
+  if (!text || !config.translate) return '';
+  try {
+    const target = targetLang();
+    const res = await translate(text, target, detect(text, lastLang));
+    if (!res || res.srcLang === target) return '';
+    return String(res.text || '').trim();
+  } catch { return ''; }
+});
 ipcMain.on('quit', () => { app.isQuiting = true; app.quit(); });
 
 // ---- Yasam dongusu ----

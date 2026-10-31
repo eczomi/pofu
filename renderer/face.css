@@ -152,6 +152,7 @@ button, select, input, textarea, details, #face, .tab, .panel { -webkit-app-regi
 
 /* ---------- Kart ---------- */
 #card {
+  position: relative;
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: var(--r-card);
@@ -372,6 +373,36 @@ kbd {
 .line.read { color: var(--text-3); }
 .line.lit { color: var(--text); background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
 #app.paused .line.lit { box-shadow: inset 2px 0 0 var(--text-3); }
+#lines, #lines .line, #lines .plain { -webkit-user-select: text; user-select: text; }
+#lines ::selection { background: var(--accent-line); color: var(--text); }
+
+/* Secim balonu: secileni oku + kisa ceviri */
+#selPop {
+  position: absolute;
+  z-index: 5;
+  display: flex; align-items: center; gap: 6px;
+  max-width: 240px;
+  padding: 4px 8px 4px 4px;
+  background: var(--bg-3);
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  animation: fadeIn 0.12s ease-out;
+  -webkit-user-select: none; user-select: none;
+}
+#selPop.hidden { display: none; }
+#selPlay {
+  flex: 0 0 auto;
+  width: 22px; height: 22px;
+  border: none; border-radius: 50%;
+  background: var(--accent); color: var(--accent-ink);
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+#selPlay svg { width: 11px; height: 11px; }
+#selPlay:hover { background: var(--accent-2); }
+#selTr { font-size: 11.5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#selTr:empty { display: none; }
 .line .l-main { display: block; }
 .line .l-sub { display: block; font-size: 11.5px; line-height: 1.4; color: var(--text-3); margin-top: 1px; }
 .line.lit .l-sub { color: var(--text-2); }

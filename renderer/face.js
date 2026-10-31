@@ -372,11 +372,13 @@ function addBlock(p) {
       const main = document.createElement('span');
       main.className = 'l-main';
       main.textContent = text;
+      main.dataset.lang = v.lang;
       const sub = document.createElement('span');
       sub.className = 'l-sub';
       sub.textContent = other.sentences[i] || '';
+      sub.dataset.lang = other.lang;
       line.append(main, sub);
-      line.addEventListener('click', () => jumpTo(indexOfEl(line)));
+      bindLineClick(line);
       el.appendChild(line);
       parts.push({ text, lang: v.lang, el: line, label: p.label || '' });
     });
@@ -401,7 +403,8 @@ function addBlock(p) {
         line.className = 'line';
         line.textContent = text;
         line.title = 'Buradan oku';
-        line.addEventListener('click', () => jumpTo(indexOfEl(line)));
+        line.dataset.lang = part.lang;
+        bindLineClick(line);
         el.appendChild(line);
         parts.push({ text, lang: part.lang, el: line, label: p.label || '' });
       }
@@ -409,6 +412,7 @@ function addBlock(p) {
       const pl = document.createElement('p');
       pl.className = 'plain';
       pl.textContent = part.sentences.join(' ');
+      pl.dataset.lang = part.lang;
       el.appendChild(pl);
     }
     block.appendChild(el);
@@ -421,6 +425,81 @@ function addBlock(p) {
   linesEl.appendChild(block);
   updateReadEmpty();
   trimList();
+}
+
+// Satira tek tik: buradan oku. Cift tik: yalniz o kelimeyi oku (telaffuz).
+// Metin seciliyken tik, okumaya atlamaz (secim balonu kullanilir).
+function bindLineClick(line) {
+  let t = null;
+  line.addEventListener('click', () => {
+    if (hasSelection()) return;
+    clearTimeout(t);
+    t = setTimeout(() => { if (!hasSelection()) jumpTo(indexOfEl(line)); }, 260);
+  });
+  line.addEventListener('dblclick', (e) => {
+    clearTimeout(t);
+    e.preventDefault();
+    onSelectionMade(true);
+  });
+}
+
+function hasSelection() {
+  const s = window.getSelection();
+  return !!(s && !s.isCollapsed && String(s).trim());
+}
+
+function selectionInfo() {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+  const text = String(sel).replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+  let node = sel.anchorNode;
+  if (node && node.nodeType === 3) node = node.parentElement;
+  const holder = node && node.closest ? node.closest('[data-lang]') : null;
+  if (!holder || !$('#lines').contains(holder)) return null;
+  return { text: text.slice(0, 300), lang: holder.dataset.lang, rect: sel.getRangeAt(0).getBoundingClientRect() };
+}
+
+// Secilen kelime/cumleyi kendi dilinde oku; suren okumayi kesmez, bitince kaldigi cumleden devam eder.
+let snippetText = '';
+function speakSnippet(text, lang) {
+  if (!text) return;
+  const wasPlaying = state === 'playing';
+  const resumeIdx = idx;
+  cancelCurrent();
+  snippetText = text;
+  setFace(true);
+  updateStatus();
+  const myGen = ++gen;
+  speak(text, lang, () => {
+    if (myGen !== gen) return;
+    snippetText = '';
+    if (wasPlaying && resumeIdx >= 0 && resumeIdx < sentences.length) playFrom(resumeIdx);
+    else { setFace(state === 'playing'); updateStatus(); }
+  });
+}
+
+let selCur = null;
+function hidePop() { $('#selPop').classList.add('hidden'); selCur = null; }
+
+async function onSelectionMade(autoRead) {
+  const info = selectionInfo();
+  if (!info) { hidePop(); return; }
+  selCur = info;
+  const pop = $('#selPop');
+  const tr = $('#selTr');
+  tr.textContent = '';
+  pop.classList.remove('hidden');
+  const card = $('#card').getBoundingClientRect();
+  const left = Math.max(8, Math.min(info.rect.left - card.left, card.width - 160));
+  pop.style.left = left + 'px';
+  pop.style.top = (info.rect.bottom - card.top + 6) + 'px';
+  if (autoRead) speakSnippet(info.text, info.lang);
+  if (cfg.translate && lang2(info.lang) !== lang2(cfg.targetLangResolved || 'tr')) {
+    tr.textContent = '…';
+    const t = await window.okur.translateSnippet(info.text);
+    if (selCur && selCur.text === info.text) tr.textContent = t || '';
+  }
 }
 
 function trimList() {
@@ -484,6 +563,7 @@ function updateStatus() {
   let txt;
   const cur = sentences[idx];
   if (busyText) { txt = busyText; line.className = 'busy'; }
+  else if (snippetText) { txt = 'Okunuyor · "' + (snippetText.length > 28 ? snippetText.slice(0, 26) + '…' : snippetText) + '"'; line.className = 'reading'; }
   else if (state === 'playing' && cur) { txt = 'Okunuyor · ' + langName(cur.lang); line.className = 'reading'; }
   else if (state === 'paused') { txt = 'Duraklatıldı'; line.className = ''; }
   else {
@@ -860,6 +940,7 @@ function applyConfigToUI() {
   setSeg('segGender', cfg.voiceGender === 'male' ? 'male' : 'female');
   setSeg('segReadWhat', cfg.readWhat === 'original' ? 'original' : 'translation');
   $('#readTools').classList.toggle('no-tr', !cfg.translate);
+  $('#btnTranslate').classList.toggle('on', !!cfg.translate);
   $('#setRate').value = cfg.rate;
   $('#rateVal').textContent = Number(cfg.rate).toFixed(2) + 'x';
   $('#setTranslate').checked = !!cfg.translate;
@@ -977,6 +1058,19 @@ function bindUI() {
     if (t.value.trim()) { window.okur.readText(t.value); t.value = ''; }
   });
   $('#btnReadClip').addEventListener('click', () => window.okur.readClipboard());
+  $('#btnTranslate').addEventListener('click', () => {
+    const on = !cfg.translate;
+    save({ translate: on });
+    $('#setTranslate').checked = on;
+    $('#btnTranslate').classList.toggle('on', on);
+    $('#readTools').classList.toggle('no-tr', !on);
+    updateStatus();
+  });
+  // Metin secimi -> kucuk "oku" balonu
+  $('#lines').addEventListener('mouseup', () => setTimeout(() => { if (hasSelection()) onSelectionMade(false); }, 10));
+  $('#selPlay').addEventListener('click', (e) => { e.stopPropagation(); if (selCur) speakSnippet(selCur.text, selCur.lang); });
+  document.addEventListener('mousedown', (e) => { if (!e.target.closest('#selPop')) hidePop(); });
+  $('#panelRead').addEventListener('scroll', hidePop);
   $('#btnQuit').addEventListener('click', () => window.okur.quit());
   $('#btnSetupVoices').addEventListener('click', () => { voiceSetupState = 'running'; updateVoiceSetupRow(); window.okur.setupVoices(); });
 
@@ -1001,7 +1095,12 @@ function bindUI() {
     if (on) { $('#setEngine').value = 'auto'; $('#setLang').value = 'auto'; detectEngine(); }
   });
   $('#setTarget').addEventListener('change', (e) => save({ targetLang: e.target.value }));
-  $('#setTranslate').addEventListener('change', (e) => { save({ translate: e.target.checked }); $('#readTools').classList.toggle('no-tr', !e.target.checked); updateStatus(); });
+  $('#setTranslate').addEventListener('change', (e) => {
+    save({ translate: e.target.checked });
+    $('#readTools').classList.toggle('no-tr', !e.target.checked);
+    $('#btnTranslate').classList.toggle('on', e.target.checked);
+    updateStatus();
+  });
   $('#setReadOnCopy').addEventListener('change', (e) => save({ readOnCopy: e.target.checked }));
   $('#setOnNewText').addEventListener('change', (e) => save({ onNewText: e.target.value }));
   $('#setRate').addEventListener('input', (e) => {
@@ -1059,6 +1158,20 @@ window.okur.onCommand((msg) => {
   else if (action === 'hotkey') setHotkeyHint(msg.hotkey, msg.ok);
   else if (action === 'add-note') addNote(msg.text);
   else if (action === 'busy') setBusy(msg.text);
+  else if (action === 'demo-sel') {
+    // Gelistirici: ikinci satirdaki alt metnin 2. kelimesini sec ve oku
+    const sub = document.querySelectorAll('#lines .l-sub')[1] || document.querySelector('#lines [data-lang]');
+    if (sub && sub.firstChild) {
+      const txt = sub.textContent;
+      const m = /\S+\s+(\S+)/.exec(txt);
+      const start = m ? m.index + m[0].length - m[1].length : 0;
+      const end = m ? start + m[1].length : txt.length;
+      const r = document.createRange();
+      r.setStart(sub.firstChild, start); r.setEnd(sub.firstChild, end);
+      const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      onSelectionMade(true);
+    }
+  }
   else if (action === 'tab') {
     setTab(msg.tab);
     if (msg.tab === 'settings') { $('#advanced').open = true; setTimeout(() => $('#setCueSound').scrollIntoView({ block: 'center' }), 300); }

@@ -22,6 +22,10 @@
   okunan cümle vurgulanır.
 - **Çeviriyi mi, orijinali mi?** Okuma panelindeki düğmeyle anında değiştir.
   İngilizce bir metni Türkçe dinleyebilir ya da İngilizce sesten dinleyebilirsin.
+  Çeviri istemeyen, araç çubuğundaki çeviri düğmesiyle tek tıkla kapatır.
+- **Tek kelimenin okunuşu:** panelde kelimeye çift tıkla; yalnız o kelime kendi dilinde okunur
+  ve yanında çevirisi belirir. Bir cümleyi ya da birkaç kelimeyi fareyle seç → çıkan ▶ ile sadece onu dinle.
+  Süren okuma kesilmez, bitince kaldığı yerden devam eder.
 - **Her dil kendi sesiyle okunur.** Türkçe için Emel/Ahmet, İngilizce için Aria/Guy gibi;
   "Ses tipi" ayarından kadın/erkek seçersin, gerisi otomatik.
 - **Sağ tık → "Oku (Pofu ile)"** Chrome/Edge uzantısıyla (`browser-extension/`),
