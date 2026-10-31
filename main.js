@@ -442,8 +442,16 @@ async function buildRead(plainText, meta) {
       if (res) {
         if (fixed === 'auto' && res.srcLang && KNOWN.has(res.srcLang)) srcLang = res.srcLang;
         if (res.srcLang !== target && res.text && res.text.trim() !== clean.trim()) {
-          const trSentences = toSentences(res.text, { skipCode: false });
-          if (trSentences.length) tr = { lang: target, sentences: trSentences };
+          const pairs = (res.pairs || []).filter((p) => p.src && p.tr);
+          if (pairs.length) {
+            // Cumle cumle hizali: orijinal[i] <-> ceviri[i]
+            srcSentences.length = 0;
+            srcSentences.push(...pairs.map((p) => p.src));
+            tr = { lang: target, sentences: pairs.map((p) => p.tr), aligned: true };
+          } else {
+            const trSentences = toSentences(res.text, { skipCode: false });
+            if (trSentences.length) tr = { lang: target, sentences: trSentences };
+          }
         }
       }
     } catch (e) {

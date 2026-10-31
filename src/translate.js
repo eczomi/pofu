@@ -51,8 +51,17 @@ async function gtxOne(q, tl, sl) {
   if (!r.ok) throw new Error('gtx ' + r.status);
   if (process.env.OKUR_DEBUG) console.log('[okur] gtx ok', q.length, 'karakter');
   const j = await r.json();
-  const text = (j[0] || []).map((seg) => seg[0] || '').join('');
-  return { text, srcLang: normLang(j[2]) };
+  const segs = j[0] || [];
+  const text = segs.map((seg) => seg[0] || '').join('');
+  // Google her kaynak cumleyi ayri bir parca olarak dondurur: [ceviri, orijinal, ...]
+  const pairs = [];
+  for (const seg of segs) {
+    const src = String(seg[1] || '').trim();
+    const tr = String(seg[0] || '').trim();
+    if (!src) continue;
+    pairs.push({ src, tr: tr || src });
+  }
+  return { text, srcLang: normLang(j[2]), pairs };
 }
 
 async function gtxRetry(q, tl, sl) {
@@ -72,7 +81,11 @@ async function viaGoogle(text, tl, sl) {
     const batch = parts.slice(i, i + 3).map((p) => gtxOne(p, tl, sl).catch(() => gtxRetry(p, tl, sl)));
     res.push(...(await Promise.all(batch)));
   }
-  return { text: res.map((r) => r.text).join('\n\n'), srcLang: res[0] ? res[0].srcLang : '' };
+  return {
+    text: res.map((r) => r.text).join('\n\n'),
+    srcLang: res[0] ? res[0].srcLang : '',
+    pairs: res.flatMap((r) => r.pairs || []),
+  };
 }
 
 async function myMemoryOne(q, tl, sl) {
@@ -86,16 +99,24 @@ async function myMemoryOne(q, tl, sl) {
   return t;
 }
 
+// Yedek servis cumle cumle cagrilir: hem 500 karakter siniri hem de
+// orijinal/ceviri eslesmesi (hizali ciftler) icin.
 async function viaMyMemory(text, tl, sl) {
   if (!sl || sl === 'auto') throw new Error('mymemory kaynak dil gerekli');
-  if (sl === tl) return { text, srcLang: sl }; // ceviri gerekmez
-  const parts = chunk(text, 450);
-  const out = [];
-  for (const p of parts) out.push(await myMemoryOne(p, tl, sl));
-  return { text: out.join('\n\n'), srcLang: sl };
+  if (sl === tl) return { text, srcLang: sl, pairs: [] }; // ceviri gerekmez
+  const sents = String(text).split(/\n+/)
+    .flatMap((b) => b.match(/[^.!?…]+[.!?…]+["')\]]*\s*|[^.!?…]+$/g) || [b])
+    .map((x) => x.trim()).filter(Boolean);
+  const pairs = [];
+  for (const src of sents) {
+    const parts = chunk(src, 450);
+    const tr = (await Promise.all(parts.map((q) => myMemoryOne(q, tl, sl)))).join(' ');
+    pairs.push({ src, tr });
+  }
+  return { text: pairs.map((p) => p.tr).join(' '), srcLang: sl, pairs };
 }
 
-// translate(text, targetLang, sourceHint) -> { text, srcLang }
+// translate(text, targetLang, sourceHint) -> { text, srcLang, pairs: [{src, tr}] }
 // srcLang: servisin algiladigi kaynak dil (2 harf). Kaynak == hedef ise
 // text hedef metnin aynisidir; cagiran taraf karsilastirip atlar.
 async function translate(text, target, sourceHint) {

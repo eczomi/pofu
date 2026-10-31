@@ -18,7 +18,8 @@
 ### Kopyala, dinle (herkes için)
 
 - **Seç → Ctrl+C.** Pofu metni alır, dilini algılar, **senin diline çevirir** ve okur.
-  Çeviri ile orijinal panelde birlikte görünür; okunan cümle vurgulanır.
+  Panelde her cümlenin altında karşılığı durur (çeviriyi okurken orijinali, orijinali okurken çevirisi);
+  okunan cümle vurgulanır.
 - **Çeviriyi mi, orijinali mi?** Okuma panelindeki düğmeyle anında değiştir.
   İngilizce bir metni Türkçe dinleyebilir ya da İngilizce sesten dinleyebilirsin.
 - **Her dil kendi sesiyle okunur.** Türkçe için Emel/Ahmet, İngilizce için Aria/Guy gibi;

@@ -355,8 +355,33 @@ function addBlock(p) {
   const voiced = voicedParts(p);
   const voicedKeys = new Set(voiced.map((v) => v.key));
   const parts = [];
+  // Cumle cumle hizali ceviri: her satirda seslendirilen cumle + altinda karsiligi
+  const aligned = p.tr && p.tr.aligned && voiced.length === 1
+    && p.src.sentences.length === p.tr.sentences.length;
   // Seslendirilen parca ustte, digeri (varsa) altta soluk
-  const order = voicedKeys.has('tr') && !voicedKeys.has('src') ? ['tr', 'src'] : ['src', 'tr'];
+  const order = aligned ? [] : (voicedKeys.has('tr') && !voicedKeys.has('src') ? ['tr', 'src'] : ['src', 'tr']);
+  if (aligned) {
+    const v = voiced[0];
+    const other = v.key === 'tr' ? p.src : p.tr;
+    const el = document.createElement('div');
+    el.className = 'part primary pairs';
+    v.sentences.forEach((text, i) => {
+      const line = document.createElement('div');
+      line.className = 'line';
+      line.title = 'Buradan oku';
+      const main = document.createElement('span');
+      main.className = 'l-main';
+      main.textContent = text;
+      const sub = document.createElement('span');
+      sub.className = 'l-sub';
+      sub.textContent = other.sentences[i] || '';
+      line.append(main, sub);
+      line.addEventListener('click', () => jumpTo(indexOfEl(line)));
+      el.appendChild(line);
+      parts.push({ text, lang: v.lang, el: line, label: p.label || '' });
+    });
+    block.appendChild(el);
+  }
   for (const key of order) {
     const part = key === 'src' ? p.src : p.tr;
     if (!part) continue;
