@@ -5,7 +5,7 @@ let cfg = {
   autoMode: true, translate: true, targetLang: '', targetLangResolved: 'tr',
   readWhat: 'translation', voiceGender: 'female',
   engine: 'auto', chatterboxUrl: 'http://127.0.0.1:7888', rate: 1.0, language: 'auto',
-  voiceByLang: {}, skipCode: true, claudeMode: true, autoRead: false, readScope: 'lastParagraph',
+  voiceByLang: {}, skipCode: true, claudeMode: true, autoRead: false, claudeArrive: 'queue', readScope: 'lastParagraph',
   cueFlash: true, cueSound: 'chime', muted: false, projectFilter: '', hotkey: 'CommandOrControl+Alt+S',
   noteHotkey: 'CommandOrControl+Alt+Q', notes: [], readOnCopy: true, onNewText: 'interrupt', miniMode: false,
 };
@@ -506,8 +506,10 @@ function setBusy(text) { busyText = text || ''; updateStatus(); }
 // ---- Bildirim (Claude yaniti) ----
 let bubbleShowing = false;
 let bubbleTimer = null;
+let cueSessionId = ''; // son bildirimin oturumu: rozete/balona tiklayinca oraya gidilir
 function showBubble(label, isQuestion, title) {
   const b = $('#bubble');
+  b.classList.toggle('go', !!cueSessionId);
   $('#bubbleHead').textContent = label + ' · ' + (isQuestion ? 'soru' : 'bitti');
   $('#bubbleText').textContent = title || '';
   b.classList.remove('hidden');
@@ -517,10 +519,12 @@ function showBubble(label, isQuestion, title) {
   bubbleTimer = setTimeout(() => { b.classList.add('hidden'); bubbleShowing = false; requestResize(); }, 5000);
 }
 
-function flashBadge(text, isQuestion, ms) {
+function flashBadge(text, isQuestion, ms, sessionId) {
   const badge = $('#cueBadge');
+  cueSessionId = sessionId || '';
   badge.textContent = text;
   badge.classList.toggle('q', !!isQuestion);
+  badge.classList.toggle('go', !!cueSessionId);
   badge.classList.add('show');
   clearTimeout(cueTimer);
   cueTimer = setTimeout(() => { badge.classList.remove('show'); $('#face').classList.remove('shake', 'blink'); }, ms || 3000);
@@ -566,7 +570,7 @@ function playCueSound(name, isQuestion) {
   } catch { /* ses yoksa sessiz gec */ }
 }
 
-function playCue(isQuestion, lang, label, title) {
+function playCue(isQuestion, lang, label, title, sessionId) {
   playCueSound(cfg.cueSound, isQuestion);
   if (!cfg.cueFlash) return;
   const face = $('#face');
@@ -574,13 +578,21 @@ function playCue(isQuestion, lang, label, title) {
   void face.offsetWidth;
   face.classList.add(isQuestion ? 'blink' : 'shake');
   if (cfg.miniMode) {
+    cueSessionId = sessionId || '';
     showBubble(label || 'Claude', isQuestion, title || '');
     clearTimeout(cueTimer);
     cueTimer = setTimeout(() => face.classList.remove('shake', 'blink'), 3000);
   } else {
     const kind = isQuestion ? 'question' : 'done';
-    flashBadge((label ? label + ' · ' : '') + (CUE_WORDS[kind][lang] || CUE_WORDS[kind].en), isQuestion, 3500);
+    flashBadge((label ? label + ' · ' : '') + (CUE_WORDS[kind][lang] || CUE_WORDS[kind].en), isQuestion, 5000, sessionId);
   }
+}
+
+// Rozete / balona tikla -> o oturumun VS Code penceresine git
+function goToCueSession() {
+  if (!cueSessionId) return;
+  window.okur.focusSession(cueSessionId);
+  if (!cfg.miniMode) setTab('sessions');
 }
 
 // ---- Sustur ----
@@ -594,17 +606,24 @@ function toggleMute() { const m = !cfg.muted; applyMuted(m); window.okur.saveCon
 // ---- Okuma akisi ----
 const lastMsgs = new Map(); // oturum id -> paket
 
-function readNow(p) {
+// opts.interrupt: okuma surerken eskisini kes (varsayilan: manuel metinde onNewText ayari)
+function readNow(p, opts) {
   lastPayload = p;
   const startIdx = sentences.length;
   addBlock(p);
   if (!cfg.miniMode) setTab('read');
-  if (state !== 'idle' && p.manual && cfg.onNewText !== 'queue') {
-    // Yeni metin: eskisini kes, yeniyi hemen oku (okunmayan eski cumleler listede kalir)
+  const interrupt = opts && 'interrupt' in opts ? !!opts.interrupt : (!!p.manual && cfg.onNewText !== 'queue');
+  if (state !== 'idle' && interrupt) {
+    // Eskisini kes, yeniyi hemen oku (okunmayan eski cumleler listede kalir)
     stopAll(true);
     stopped = false;
     console.log('[pofu] yeni metin: eski okuma kesildi');
-  } else if (state === 'playing') { flashBadge('sıraya eklendi', false, 1400); requestResize(); return; }
+  } else if (state !== 'idle') {
+    // Siraya eklendi; duraklatilmissa devam edince sirasi gelir
+    flashBadge('sıraya eklendi', false, 1400);
+    requestResize();
+    return;
+  }
   if (sentences.length > startIdx) jumpTo(startIdx);
   requestResize();
 }
@@ -613,9 +632,13 @@ function onRead(msg) {
   if (!msg || !msg.src || !msg.src.sentences || !msg.src.sentences.length) return;
   if (msg.manual) { readNow(msg); return; }
   if (msg.id) lastMsgs.set(msg.id, msg);
-  playCue(msg.kind === 'approval', msg.src.lang, msg.label, msg.title || '');
-  if (cfg.autoRead && !cfg.muted && state === 'idle') {
-    setTimeout(() => { if (state === 'idle') readNow(msg); }, 150);
+  playCue(msg.kind === 'approval', msg.src.lang, msg.label, msg.title || '', msg.id);
+  if (cfg.autoRead && !cfg.muted) {
+    const mode = cfg.claudeArrive || 'queue';
+    if (state === 'idle') setTimeout(() => { if (state === 'idle') readNow(msg); }, 150);
+    else if (mode === 'interrupt') readNow(msg, { interrupt: true });
+    else if (mode === 'queue') readNow(msg, { interrupt: false });
+    // 'skip': okuma surerken yalniz bildirim
   }
 }
 
@@ -849,6 +872,7 @@ function applyConfigToUI() {
   $('#setClaudeMode').checked = cfg.claudeMode !== false;
   $('#setScope').value = cfg.readScope || 'lastParagraph';
   $('#setAutoRead').checked = !!cfg.autoRead;
+  $('#setClaudeArrive').value = ['queue', 'interrupt', 'skip'].includes(cfg.claudeArrive) ? cfg.claudeArrive : 'queue';
   $('#setSkipCode').checked = !!cfg.skipCode;
   $('#setCueFlash').checked = !!cfg.cueFlash;
   $('#setCueSound').value = cfg.cueSound || 'chime';
@@ -1004,6 +1028,9 @@ function bindUI() {
   });
   $('#setScope').addEventListener('change', (e) => save({ readScope: e.target.value }));
   $('#setAutoRead').addEventListener('change', (e) => save({ autoRead: e.target.checked }));
+  $('#setClaudeArrive').addEventListener('change', (e) => save({ claudeArrive: e.target.value }));
+  $('#cueBadge').addEventListener('click', (e) => { e.stopPropagation(); goToCueSession(); });
+  $('#bubble').addEventListener('click', (e) => { e.stopPropagation(); goToCueSession(); });
   $('#setSkipCode').addEventListener('change', (e) => save({ skipCode: e.target.checked }));
   $('#setCueFlash').addEventListener('change', (e) => save({ cueFlash: e.target.checked }));
   $('#setCueSound').addEventListener('change', (e) => { save({ cueSound: e.target.value }); playCueSound(e.target.value, false); });

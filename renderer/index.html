@@ -16,10 +16,10 @@
         <img id="faceImg" src="../assets/face.png" alt="" />
         <div id="fallbackFace">✨</div>
       </div>
-      <div id="cueBadge"></div>
+      <div id="cueBadge" title="Tıkla: bu oturuma git"></div>
       <button id="miniChip" title="Görevler"></button>
     </div>
-    <div id="bubble" class="hidden"><b id="bubbleHead"></b><span id="bubbleText"></span></div>
+    <div id="bubble" class="hidden" title="Tıkla: bu oturuma git"><b id="bubbleHead"></b><span id="bubbleText"></span></div>
 
     <!-- Normal mod: tek kart -->
     <div id="card">
@@ -189,6 +189,14 @@
           <div class="srow switch">
             <div class="slabel"><b>Yanıt gelince sesli oku</b></div>
             <input id="setAutoRead" type="checkbox" class="sw" />
+          </div>
+          <div class="srow">
+            <label for="setClaudeArrive">Okuma sürerken</label>
+            <select id="setClaudeArrive" title="Claude yanıtı geldiğinde Pofu başka bir şey okuyorsa">
+              <option value="queue">Sıraya ekle, sonra oku</option>
+              <option value="interrupt">Kes, Claude yanıtını oku</option>
+              <option value="skip">Atla, sadece bildir</option>
+            </select>
           </div>
           <div class="srow switch">
             <div class="slabel"><b>Kod bloklarını atla</b></div>

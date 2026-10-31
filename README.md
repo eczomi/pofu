@@ -38,7 +38,8 @@ Ayarlarla uğraşmak isteyenler için **Gelişmiş** bölümü ayrıca duruyor (
 ### Claude Code takibi (isteğe bağlı)
 
 - **Oturumlar sekmesi:** her Claude oturumu bir satır: çalışıyor / onay bekliyor / bitti + son mesajın özeti.
-- **Satıra tıkla → o VS Code penceresine git.**
+- **Satıra tıkla → o VS Code penceresine git.** Bitince çıkan rozete (mini modda balona) tıklamak da aynı pencereye götürür.
+- **Okuma sürerken Claude yanıtı gelirse** (sesli okuma açıksa): sıraya ekle / kes ve Claude'u oku / atla. Gelişmiş → "Okuma sürerken".
 - Kullanmıyorsan Gelişmiş → **Claude oturum takibi** kapat; sekme kaybolur.
 
 Claude Code her oturumu `~/.claude/projects/**/*.jsonl` dosyasına yazar. Pofu bu dosyaları izler; ekran kazıma, eklenti yok.
@@ -97,6 +98,7 @@ istemiyorsan Ayarlar → **Çeviri** kapat. Çeviri yoksa (çevrimdışı) metin
 | Gelişmiş → **Seslendir** | Çeviriyi / orijinali / önce orijinali sonra çeviriyi |
 | Gelişmiş → **Claude oturum takibi** | Kapat → saf ekran okuyucu |
 | Gelişmiş → **Bitince ses** | Claude yanıtı bitince bildirim sesi: Kapalı / Çan / Ping / Zil / Pop / Marimba (soruda yükselen nota) |
+| Gelişmiş → **Okuma sürerken** | Claude yanıtı gelince başka şey okunuyorsa: sıraya ekle / kes / atla |
 | Gelişmiş → **Ne okunsun** | Claude yanıtının son paragrafı / son cümlesi / tümü |
 | Gelişmiş → **Kısayollar** | Oku: `Ctrl+Alt+S` · Görev: `Ctrl+Alt+Q` |
 

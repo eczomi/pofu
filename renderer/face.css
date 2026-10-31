@@ -106,6 +106,8 @@ button, select, input, textarea, details, #face, .tab, .panel { -webkit-app-regi
 }
 #cueBadge.show { opacity: 1; }
 #cueBadge.q { color: var(--accent-2); border-color: var(--accent-line); }
+#cueBadge.show.go { pointer-events: auto; cursor: pointer; -webkit-app-region: no-drag; }
+#cueBadge.show.go:hover { background: var(--accent-soft); border-color: var(--accent-line); }
 
 /* Mini mod cipi ve balonu */
 #miniChip {
@@ -145,6 +147,8 @@ button, select, input, textarea, details, #face, .tab, .panel { -webkit-app-regi
 #bubble b { display: block; font-size: 11px; color: var(--accent-2); }
 #bubble span { display: block; font-size: 11px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #app.mini #bubble:not(.hidden) { display: block; }
+#bubble.go { cursor: pointer; -webkit-app-region: no-drag; }
+#bubble.go:hover { border-color: var(--accent-line); background: var(--bg-3); }
 
 /* ---------- Kart ---------- */
 #card {

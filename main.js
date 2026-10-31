@@ -32,6 +32,7 @@ const DEFAULT_CONFIG = {
   skipCode: true,                          // kod bloklarini okuma
   claudeMode: true,                        // Claude Code oturum takibi
   autoRead: false,                         // Claude yaniti gelince otomatik SESLI oku
+  claudeArrive: 'queue',                   // autoRead acik ve okuma surerken: 'queue' | 'interrupt' | 'skip'
   readScope: 'lastParagraph',              // 'all' | 'lastParagraph' | 'lastSentence'
   settleMs: 2500,
   cueFlash: true,
@@ -662,6 +663,11 @@ function runDemo() {
   setTimeout(() => manualRead(demo, 'Kopyalanan metin'), 800);
   if (process.env.OKUR_DEMO === '2') setTimeout(() => manualRead('İkinci metin: bu yeni kopyalanan yazı, eskisini kesmeli.', 'Kopyalanan metin'), 4500);
   if (process.env.OKUR_DEMO_TAB) setTimeout(() => sendCommand('tab', { tab: process.env.OKUR_DEMO_TAB }), 5000);
+  if (process.env.OKUR_DEMO_CUE && win) setTimeout(() => win.webContents.send('read', {
+    id: 'a', label: 'para-app', kind: 'approval', isQuestion: true, manual: false,
+    title: 'Veritabanı şemasını değiştireyim mi?',
+    src: { lang: 'tr', sentences: ['Veritabanı şemasını değiştireyim mi?'] }, tr: null,
+  }), Number(process.env.OKUR_DEMO_CUE));
   if (config.claudeMode) {
     setTimeout(() => {
       const mk = (id, label, status, title) => sessions.set(id, { id, label, cwd: '', status, title, ts: Date.now(), lastActivity: Date.now() });
