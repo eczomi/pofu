@@ -25,7 +25,7 @@
   "Ses tipi" ayarından kadın/erkek seçersin, gerisi otomatik.
 - **Sağ tık → "Oku (Pofu ile)"** Chrome/Edge uzantısıyla (`browser-extension/`),
   **kısayol** `Ctrl+Alt+S` panodaki metni okur.
-- **Kuyruk.** Üst üste birkaç şey gönderirsen sırayla okur; ■ hepsini iptal eder.
+- **Yeni metin gelince** eskisini keser ve yeniyi okur (varsayılan). İstersen "Sıraya ekle" ile üst üste gönderilenleri sırayla dinlersin; ■ hepsini iptal eder.
 - **Görevler.** Adım adım talimatı kopyala → `Ctrl+Alt+Q` → tik atılabilir liste.
 
 ### Otomatik ayar
@@ -88,6 +88,7 @@ istemiyorsan Ayarlar → **Çeviri** kapat. Çeviri yoksa (çevrimdışı) metin
 | **Hız** | Konuşma hızı |
 | **Çeviri** | Yabancı metni benim dilime çevir ve göster |
 | **Kopyalayınca oku** | Seç → Ctrl+C → oku |
+| **Yeni metin gelince** | Eskiyi kes ve yeniyi oku (varsayılan) ya da sıraya ekle |
 | **Doğal sesler** | Ses sunucusunu kur / güncelle |
 | Gelişmiş → **Motor** | Otomatik / Doğal ses (sunucu) / Windows sesi |
 | Gelişmiş → **Okuma dili** | Otomatik algıla ya da sabit dil |

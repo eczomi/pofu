@@ -43,6 +43,7 @@ const DEFAULT_CONFIG = {
   notes: [],
   httpPort: 7889,
   readOnCopy: true,
+  onNewText: 'interrupt',                  // yeni metin gelince: 'interrupt' (eskiyi kes) | 'queue' (siraya ekle)
   miniMode: false,
   cfgVersion: 4,
   x: null, y: null,
@@ -651,6 +652,7 @@ function startApiServer() {
 function runDemo() {
   const demo = 'Pofu reads any text you copy. It detects the language, translates it into yours and reads it aloud with a natural voice. Should I continue with the next step?';
   setTimeout(() => manualRead(demo, 'Kopyalanan metin'), 800);
+  if (process.env.OKUR_DEMO === '2') setTimeout(() => manualRead('İkinci metin: bu yeni kopyalanan yazı, eskisini kesmeli.', 'Kopyalanan metin'), 4500);
   if (process.env.OKUR_DEMO_TAB) setTimeout(() => sendCommand('tab', { tab: process.env.OKUR_DEMO_TAB }), 5000);
   if (config.claudeMode) {
     setTimeout(() => {

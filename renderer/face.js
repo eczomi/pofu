@@ -7,7 +7,7 @@ let cfg = {
   engine: 'auto', chatterboxUrl: 'http://127.0.0.1:7888', rate: 1.0, language: 'auto',
   voiceByLang: {}, skipCode: true, claudeMode: true, autoRead: false, readScope: 'lastParagraph',
   cueFlash: true, cueSound: 'chime', muted: false, projectFilter: '', hotkey: 'CommandOrControl+Alt+S',
-  noteHotkey: 'CommandOrControl+Alt+Q', notes: [], readOnCopy: true, miniMode: false,
+  noteHotkey: 'CommandOrControl+Alt+Q', notes: [], readOnCopy: true, onNewText: 'interrupt', miniMode: false,
 };
 
 let sentences = [];      // seslendirilecek cumleler: { text, lang, el, label }
@@ -574,7 +574,12 @@ function readNow(p) {
   const startIdx = sentences.length;
   addBlock(p);
   if (!cfg.miniMode) setTab('read');
-  if (state === 'playing') { flashBadge('sıraya eklendi', false, 1400); requestResize(); return; }
+  if (state !== 'idle' && p.manual && cfg.onNewText !== 'queue') {
+    // Yeni metin: eskisini kes, yeniyi hemen oku (okunmayan eski cumleler listede kalir)
+    stopAll(true);
+    stopped = false;
+    console.log('[pofu] yeni metin: eski okuma kesildi');
+  } else if (state === 'playing') { flashBadge('sıraya eklendi', false, 1400); requestResize(); return; }
   if (sentences.length > startIdx) jumpTo(startIdx);
   requestResize();
 }
@@ -811,6 +816,7 @@ function applyConfigToUI() {
   $('#rateVal').textContent = Number(cfg.rate).toFixed(2) + 'x';
   $('#setTranslate').checked = !!cfg.translate;
   $('#setReadOnCopy').checked = !!cfg.readOnCopy;
+  $('#setOnNewText').value = cfg.onNewText === 'queue' ? 'queue' : 'interrupt';
   $('#setEngine').value = cfg.engine || 'auto';
   fillSelect($('#setLang'), [['auto', 'Otomatik algıla'], ...LANGS], cfg.language || 'auto');
   populateVoiceSelect();
@@ -948,6 +954,7 @@ function bindUI() {
   $('#setTarget').addEventListener('change', (e) => save({ targetLang: e.target.value }));
   $('#setTranslate').addEventListener('change', (e) => { save({ translate: e.target.checked }); $('#readTools').classList.toggle('no-tr', !e.target.checked); updateStatus(); });
   $('#setReadOnCopy').addEventListener('change', (e) => save({ readOnCopy: e.target.checked }));
+  $('#setOnNewText').addEventListener('change', (e) => save({ onNewText: e.target.value }));
   $('#setRate').addEventListener('input', (e) => {
     const r = Number(e.target.value);
     $('#rateVal').textContent = r.toFixed(2) + 'x';

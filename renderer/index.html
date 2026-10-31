@@ -133,6 +133,13 @@
           <div class="slabel"><b>Kopyalayınca oku</b><small>Seç, Ctrl+C: hemen okur</small></div>
           <input id="setReadOnCopy" type="checkbox" class="sw" />
         </div>
+        <div class="srow">
+          <label for="setOnNewText">Yeni metin gelince</label>
+          <select id="setOnNewText">
+            <option value="interrupt">Eskiyi kes, yeniyi oku</option>
+            <option value="queue">Sıraya ekle, sırası gelince oku</option>
+          </select>
+        </div>
 
         <div class="srow voices" id="voiceSetupRow">
           <div class="slabel"><b>Doğal sesler</b><small id="voiceSetupHint">Kurulu değil. Windows sesi kullanılıyor.</small></div>
