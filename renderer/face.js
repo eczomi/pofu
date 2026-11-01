@@ -5,7 +5,7 @@ let cfg = {
   autoMode: true, translate: true, targetLang: '', targetLangResolved: 'tr',
   readWhat: 'translation', voiceGender: 'female',
   engine: 'auto', chatterboxUrl: 'http://127.0.0.1:7888', rate: 1.0, language: 'auto',
-  voiceByLang: {}, skipCode: true, claudeMode: true, autoRead: false, claudeArrive: 'queue', readScope: 'lastParagraph',
+  voiceByLang: {}, accents: {}, skipCode: true, claudeMode: true, autoRead: false, claudeArrive: 'queue', readScope: 'lastParagraph',
   cueFlash: true, cueSound: 'chime', muted: false, projectFilter: '', hotkey: 'CommandOrControl+Alt+S',
   noteHotkey: 'CommandOrControl+Alt+Q', notes: [], readOnCopy: true, onNewText: 'interrupt', miniMode: false,
 };
@@ -50,6 +50,57 @@ const SERVER_DEFAULTS = {
   el: ['el-GR-AthinaNeural', 'el-GR-NestorasNeural'], he: ['he-IL-HilaNeural', 'he-IL-AvriNeural'],
   th: ['th-TH-PremwadeeNeural', 'th-TH-NiwatNeural'],
 };
+// Aksan (bolge) secenekleri: [yerel kod, etiket, onerilen kadin, onerilen erkek].
+// Ilk satir varsayilan. Onerilen ses sunucuda yoksa ayni bolgeden uygun ses secilir.
+const ACCENTS = {
+  en: [
+    ['en-US', 'Amerikan', 'en-US-AriaNeural', 'en-US-GuyNeural'],
+    ['en-GB', 'İngiliz', 'en-GB-SoniaNeural', 'en-GB-RyanNeural'],
+    ['en-AU', 'Avustralya', 'en-AU-NatashaNeural', 'en-AU-WilliamMultilingualNeural'],
+    ['en-CA', 'Kanada', 'en-CA-ClaraNeural', 'en-CA-LiamNeural'],
+    ['en-IE', 'İrlanda', 'en-IE-EmilyNeural', 'en-IE-ConnorNeural'],
+    ['en-IN', 'Hint', 'en-IN-NeerjaNeural', 'en-IN-PrabhatNeural'],
+  ],
+  pt: [
+    ['pt-BR', 'Brezilya', 'pt-BR-FranciscaNeural', 'pt-BR-AntonioNeural'],
+    ['pt-PT', 'Portekiz', 'pt-PT-RaquelNeural', 'pt-PT-DuarteNeural'],
+  ],
+  es: [
+    ['es-ES', 'İspanya', 'es-ES-ElviraNeural', 'es-ES-AlvaroNeural'],
+    ['es-MX', 'Meksika', 'es-MX-DaliaNeural', 'es-MX-JorgeNeural'],
+    ['es-AR', 'Arjantin', 'es-AR-ElenaNeural', 'es-AR-TomasNeural'],
+  ],
+  fr: [
+    ['fr-FR', 'Fransa', 'fr-FR-DeniseNeural', 'fr-FR-HenriNeural'],
+    ['fr-CA', 'Québec', 'fr-CA-SylvieNeural', 'fr-CA-AntoineNeural'],
+    ['fr-BE', 'Belçika', 'fr-BE-CharlineNeural', 'fr-BE-GerardNeural'],
+    ['fr-CH', 'İsviçre', 'fr-CH-ArianeNeural', 'fr-CH-FabriceNeural'],
+  ],
+  de: [
+    ['de-DE', 'Almanya', 'de-DE-KatjaNeural', 'de-DE-ConradNeural'],
+    ['de-AT', 'Avusturya', 'de-AT-IngridNeural', 'de-AT-JonasNeural'],
+    ['de-CH', 'İsviçre', 'de-CH-LeniNeural', 'de-CH-JanNeural'],
+  ],
+  zh: [
+    ['zh-CN', 'Mandarin', 'zh-CN-XiaoxiaoNeural', 'zh-CN-YunxiNeural'],
+    ['zh-TW', 'Tayvan', 'zh-TW-HsiaoChenNeural', 'zh-TW-YunJheNeural'],
+  ],
+};
+const ACCENT_SAMPLE = {
+  en: 'Hello! This is how I sound.', pt: 'Olá! É assim que eu falo.', es: 'Hola, así es como sueno.',
+  fr: 'Bonjour, voici ma voix.', de: 'Hallo, so klinge ich.', zh: '你好，这是我的声音。',
+};
+// Bu dil icin secili aksan satiri (yoksa null = dilin varsayilani)
+function accentFor(lc) {
+  const list = ACCENTS[lc];
+  if (!list) return null;
+  const want = cfg.accents && cfg.accents[lc];
+  return list.find((a) => a[0] === want) || null;
+}
+let regionNames = null;
+try { regionNames = new Intl.DisplayNames(['tr'], { type: 'region' }); } catch { /* */ }
+const regionOf = (loc) => { const r = String(loc || '').split('-')[1] || ''; try { return regionNames ? regionNames.of(r) : r; } catch { return r; } };
+
 // Windows ses adlarindan cinsiyet tahmini
 const FEMALE_RE = /zira|hazel|susan|heera|hoda|hedda|helena|elsa|laura|paulina|irina|haruka|ayumi|heami|huihui|yaoyao|tracy|catherine|linda|sabina|hortense|julie|hanna|caroline|kalpana|maria|emel|seda|filiz|female|kadın/i;
 const MALE_RE = /david|mark|george|james|richard|ravi|stefan|hemant|ichiro|kangkang|tolga|pablo|raul|cosimo|paul|frank|bart|adam|pavel|ivan|andika|male|erkek/i;
@@ -83,10 +134,18 @@ function serverVoiceFor(lang) {
   const lc = lang2(lang) || 'en';
   const u = userVoiceFor(lc);
   if (u && isServerVoice(u)) return u;
+  const g = wantMale() ? 'male' : 'female';
+  const acc = accentFor(lc);
+  if (acc) {
+    const def = acc[wantMale() ? 3 : 2];
+    if (!serverVoices.length || isServerVoice(def)) return def;
+    const reg = serverVoices.filter((v) => v.lang === acc[0]);
+    const pick = reg.find((v) => String(v.gender).toLowerCase() === g) || reg[0];
+    if (pick) return pick.name;
+  }
   const def = (SERVER_DEFAULTS[lc] || SERVER_DEFAULTS.en)[wantMale() ? 1 : 0];
   if (!serverVoices.length || isServerVoice(def)) return def;
   const same = serverVoices.filter((v) => lang2(v.lang) === lc);
-  const g = wantMale() ? 'male' : 'female';
   const byGender = same.find((v) => String(v.gender).toLowerCase() === g);
   return (byGender || same[0] || { name: '' }).name;
 }
@@ -96,8 +155,13 @@ function browserVoiceFor(lang) {
   const lc = lang2(lang) || 'en';
   const u = userVoiceFor(lc);
   if (u) { const v = voices.find((x) => x.name === u); if (v) return v; }
-  const same = voices.filter((v) => lang2(v.lang) === lc);
+  let same = voices.filter((v) => lang2(v.lang) === lc);
   if (!same.length) return null;
+  const acc = accentFor(lc);
+  if (acc) {
+    const reg = same.filter((v) => String(v.lang).replace('_', '-').toLowerCase() === acc[0].toLowerCase());
+    if (reg.length) same = reg;
+  }
   const re = wantMale() ? MALE_RE : FEMALE_RE;
   return same.find((v) => re.test(v.name)) || same[0];
 }
@@ -202,7 +266,8 @@ function speakBrowser(text, lang, onend) {
   try { speechSynthesis.cancel(); } catch { /* */ }
   const u = new SpeechSynthesisUtterance(text);
   const v = browserVoiceFor(lang);
-  u.lang = v ? v.lang : (lang || 'en');
+  const acc = accentFor(lang2(lang));
+  u.lang = v ? v.lang : (acc ? acc[0] : (lang || 'en'));
   if (v) u.voice = v;
   u.rate = cfg.rate || 1;
   u.onend = () => onend && onend();
@@ -226,6 +291,7 @@ async function speakServer(text, lang, onend) {
   } catch (e) {
     if (myGen !== gen) return;
     serverError = (e && e.message) || 'ses sunucusu hatasi';
+    console.log('[pofu] ses sunucusu hatasi:', serverError);
     updateStatus();
     speakBrowser(text, lang, onend); // bu cumle icin Windows sesine dus
   }
@@ -870,6 +936,20 @@ function fillSelect(sel, items, value) {
   if (sel.value !== value && sel.options.length) sel.selectedIndex = 0;
 }
 
+function populateAccent() {
+  const langSel = $('#setAccentLang');
+  const sel = $('#setAccent');
+  if (!langSel || !sel) return;
+  if (!langSel.options.length) {
+    const tl = cfg.targetLangResolved;
+    const first = ACCENTS[tl] && tl !== 'en' ? tl : 'en';
+    fillSelect(langSel, LANGS.filter(([c]) => ACCENTS[c]), first);
+  }
+  const lc = langSel.value || 'en';
+  const cur = accentFor(lc);
+  fillSelect(sel, ACCENTS[lc].map((a) => [a[0], a[1]]), cur ? cur[0] : ACCENTS[lc][0][0]);
+}
+
 function populateVoiceSelect() {
   const langSel = $('#setVoiceLang');
   const sel = $('#setVoice');
@@ -887,7 +967,7 @@ function populateVoiceSelect() {
     for (const v of sv) {
       const o = document.createElement('option');
       o.value = v.name;
-      o.textContent = v.name.replace(/^[a-z]{2}-[A-Z]{2}-/, '').replace(/Neural$/, '') + (v.gender ? ' · ' + (v.gender === 'Female' ? 'kadın' : 'erkek') : '');
+      o.textContent = v.name.replace(/^[a-z]{2,3}-[A-Za-z]{2,4}-/, '').replace(/(Multilingual)?Neural$/, '') + ' · ' + regionOf(v.lang) + (v.gender ? ' · ' + (v.gender === 'Female' ? 'kadın' : 'erkek') : '');
       g.appendChild(o);
     }
     sel.appendChild(g);
@@ -938,6 +1018,7 @@ function applyConfigToUI() {
   $('#setAuto').checked = !!cfg.autoMode;
   fillSelect($('#setTarget'), [['', 'Sistem dili (' + langName(cfg.targetLangResolved || 'tr') + ')'], ...LANGS], cfg.targetLang || '');
   setSeg('segGender', cfg.voiceGender === 'male' ? 'male' : 'female');
+  populateAccent();
   setSeg('segReadWhat', cfg.readWhat === 'original' ? 'original' : 'translation');
   $('#readTools').classList.toggle('no-tr', !cfg.translate);
   $('#btnTranslate').classList.toggle('on', !!cfg.translate);
@@ -1088,6 +1169,23 @@ function bindUI() {
     updateStatus();
   }));
 
+  $('#setAccentLang').addEventListener('change', populateAccent);
+  $('#setAccent').addEventListener('change', (e) => {
+    const lc = $('#setAccentLang').value;
+    const loc = e.target.value;
+    const patch = { accents: { ...(cfg.accents || {}), [lc]: loc } };
+    // Bu dil icin baska bolgeden sabitlenmis ses varsa birak: aksan secimi gecerli olsun
+    const pin = cfg.voiceByLang && cfg.voiceByLang[lc];
+    if (pin && /^[a-z]{2}-[A-Z]{2}-/.test(pin) && !pin.startsWith(loc + '-')) {
+      const map = { ...cfg.voiceByLang }; delete map[lc]; patch.voiceByLang = map;
+    }
+    save(patch);
+    audioCache.clear();
+    populateVoiceSelect();
+    updateStatus();
+    speakSnippet(ACCENT_SAMPLE[lc] || 'Hello!', loc); // nasil duyuldugunu hemen dinlet
+  });
+
   $('#setAuto').addEventListener('change', (e) => {
     const on = e.target.checked;
     save(on ? { autoMode: true, engine: 'auto', language: 'auto' } : { autoMode: false });
@@ -1173,6 +1271,8 @@ window.okur.onCommand((msg) => {
     }
   }
   else if (action === 'tab') {
+    // Gelistirici: 'settings-top' -> ayarlarin ustu (kaydirmadan)
+    if (msg.tab === 'settings-top') { setTab('settings'); console.log('[pofu] en sesi:', serverVoiceFor('en')); return; }
     setTab(msg.tab);
     if (msg.tab === 'settings') { $('#advanced').open = true; setTimeout(() => $('#setCueSound').scrollIntoView({ block: 'center' }), 300); }
   }

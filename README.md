@@ -28,6 +28,7 @@
   Süren okuma kesilmez, bitince kaldığı yerden devam eder.
 - **Her dil kendi sesiyle okunur.** Türkçe için Emel/Ahmet, İngilizce için Aria/Guy gibi;
   "Ses tipi" ayarından kadın/erkek seçersin, gerisi otomatik.
+  İngiliz (ya da Avustralya, Kanada...) aksanı istersen Ayarlar → **Aksan**.
 - **Sağ tık → "Oku (Pofu ile)"** Chrome/Edge uzantısıyla (`browser-extension/`),
   **kısayol** `Ctrl+Alt+S` panodaki metni okur.
 - **Yeni metin gelince** eskisini keser ve yeniyi okur (varsayılan). İstersen "Sıraya ekle" ile üst üste gönderilenleri sırayla dinlersin; ■ hepsini iptal eder.
@@ -91,6 +92,7 @@ istemiyorsan Ayarlar → **Çeviri** kapat. Çeviri yoksa (çevrimdışı) metin
 | **Otomatik ayar** | Motor, dil ve sesi Pofu seçer (önerilir) |
 | **Benim dilim** | Çevirilerin hedef dili; boş = sistem dili |
 | **Ses tipi** | Kadın / erkek; her dilde uygun ses seçilir |
+| **Aksan** | Dil için bölge aksanı: İngilizce Amerikan / İngiliz / Avustralya / Kanada / İrlanda / Hint; ayrıca Portekizce, İspanyolca, Fransızca, Almanca, Çince. Seçince örnek okur. Otomatik ayar açıkken de geçerli |
 | **Hız** | Konuşma hızı |
 | **Çeviri** | Yabancı metni benim dilime çevir ve göster |
 | **Kopyalayınca oku** | Seç → Ctrl+C → oku |

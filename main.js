@@ -23,6 +23,7 @@ const DEFAULT_CONFIG = {
   targetLang: '',                          // benim dilim; '' = sistem dili
   readWhat: 'translation',                 // 'translation' | 'original' | 'both' — hangisi seslendirilsin
   voiceGender: 'female',                   // 'female' | 'male' — her dilde tercih edilen ses tipi
+  accents: {},                             // dil -> aksan (ornek { en: 'en-GB' }); otomatik modda da gecerli
   // --- Gelismis ---
   engine: 'auto',                          // 'auto' | 'browser' | 'chatterbox'
   chatterboxUrl: 'http://127.0.0.1:7888',

@@ -495,6 +495,8 @@ kbd {
   font: inherit; font-size: 12px;
 }
 .srow select.narrow { flex: 0 0 96px; }
+#setAccentLang { flex: 0 0 76px; padding-right: 2px; }
+#setAccent { padding: 0 2px 0 6px; }
 .srow .icon-btn { flex: 0 0 auto; border: 1px solid var(--line-2); border-radius: var(--r-ctl); width: 28px; height: 28px; }
 .srow select:focus, .srow input[type="text"]:focus { outline: none; border-color: var(--accent-line); }
 .srow input[type="range"] { flex: 1; accent-color: var(--accent); }
