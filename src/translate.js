@@ -36,11 +36,36 @@ function normLang(code) {
   return String(code || '').toLowerCase().split(/[-_]/)[0];
 }
 
+// Electron icinde Chromium ag katmanini (net.fetch) kullan: Google, Electron'daki
+// Node fetch isteklerine surekli 429 donuyor; net.fetch ile ayni istek geciyor.
+// Duz Node'da (testler) require('electron') bir dosya yolu dondurur -> global fetch.
+let netFetch = null;
+try {
+  const el = require('electron');
+  if (el && typeof el === 'object' && el.net && typeof el.net.fetch === 'function') netFetch = el.net.fetch.bind(el.net);
+} catch { /* */ }
+
 async function fetchTimeout(url, opts, ms) {
   const c = new AbortController();
   const t = setTimeout(() => c.abort(), ms);
-  try { return await fetch(url, { ...opts, signal: c.signal }); }
-  finally { clearTimeout(t); }
+  try {
+    if (netFetch) {
+      try { return await netFetch(url, { ...opts, signal: c.signal }); }
+      catch (e) { if (c.signal.aborted) throw e; /* net hatasi: Node fetch ile dene */ }
+    }
+    return await fetch(url, { ...opts, signal: c.signal });
+  } finally { clearTimeout(t); }
+}
+
+// Islari en fazla n tanesi ayni anda calisacak sekilde yurut; sira korunur.
+async function pool(items, n, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) { const i = next++; out[i] = await fn(items[i], i); }
+  };
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, worker));
+  return out;
 }
 
 async function gtxOne(q, tl, sl) {
@@ -105,14 +130,15 @@ async function viaMyMemory(text, tl, sl) {
   if (!sl || sl === 'auto') throw new Error('mymemory kaynak dil gerekli');
   if (sl === tl) return { text, srcLang: sl, pairs: [] }; // ceviri gerekmez
   const sents = String(text).split(/\n+/)
-    .flatMap((b) => b.match(/[^.!?…]+[.!?…]+["')\]]*\s*|[^.!?…]+$/g) || [b])
+    // Cumle sonu: noktalama + bosluk/son ("Node.js", "3.5" gibi ici noktalilar bolunmez)
+    .flatMap((b) => b.match(/.*?[.!?…]+["')\]]*(?:\s+|$)|.+$/g) || [b])
     .map((x) => x.trim()).filter(Boolean);
-  const pairs = [];
-  for (const src of sents) {
+  // Cumleler 4'er 4'er paralel (sirayla tek tek cevirmek uzun metinde cok yavasti)
+  const pairs = await pool(sents, 4, async (src) => {
     const parts = chunk(src, 450);
     const tr = (await Promise.all(parts.map((q) => myMemoryOne(q, tl, sl)))).join(' ');
-    pairs.push({ src, tr });
-  }
+    return { src, tr };
+  });
   return { text: pairs.map((p) => p.tr).join(' '), srcLang: sl, pairs };
 }
 

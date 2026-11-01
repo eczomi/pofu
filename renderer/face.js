@@ -258,6 +258,7 @@ function prefetch(i) {
 }
 
 function speak(text, lang, onend) {
+  console.log('[pofu] konus:', engine, lang, engine === 'chatterbox' ? serverVoiceFor(lang) : '', String(text).slice(0, 40));
   if (engine === 'chatterbox') return speakServer(text, lang, onend);
   return speakBrowser(text, lang, onend);
 }
@@ -754,6 +755,7 @@ const lastMsgs = new Map(); // oturum id -> paket
 
 // opts.interrupt: okuma surerken eskisini kes (varsayilan: manuel metinde onNewText ayari)
 function readNow(p, opts) {
+  console.log('[pofu] okuma geldi:', (p.src && p.src.sentences.length) || 0, 'cumle, durum=' + state);
   lastPayload = p;
   const startIdx = sentences.length;
   addBlock(p);

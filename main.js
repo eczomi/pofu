@@ -439,6 +439,7 @@ function makeTitle(sentences) {
 // Donus: { src: {lang, sentences}, tr: {lang, sentences} | null, ... }
 const KNOWN = new Set(['tr', 'en', 'de', 'fr', 'es', 'it', 'pt', 'nl', 'pl', 'sv', 'ru', 'ja', 'ko', 'zh', 'ar', 'hi', 'el', 'he', 'th']);
 
+const TRANSLATE_MAX_MS = 15000;
 async function buildRead(plainText, meta) {
   const text = String(plainText || '').trim();
   const srcSentences = toSentences(text, { skipCode: config.skipCode });
@@ -454,7 +455,11 @@ async function buildRead(plainText, meta) {
     sendCommand('busy', { text: 'Çevriliyor…' });
     try {
       const clean = stripMarkdown(text, { skipCode: config.skipCode });
-      const res = await translate(clean, target, srcLang);
+      // Ceviri servisleri cok yavaslarsa bekleme: metni cevirisiz oku
+      const res = await Promise.race([
+        translate(clean, target, srcLang),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('ceviri zaman asimi')), TRANSLATE_MAX_MS)),
+      ]);
       if (res) {
         if (fixed === 'auto' && res.srcLang && KNOWN.has(res.srcLang)) srcLang = res.srcLang;
         if (res.srcLang !== target && res.text && res.text.trim() !== clean.trim()) {
